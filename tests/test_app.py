@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -14,6 +15,23 @@ from app.schemas import Passengers, SeatClass, TrainType
 from app.services import get_booking_service, get_watch_service
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _force_mock(monkeypatch):
+    """이 모듈의 통합 스모크 테스트는 mock provider 기준이다.
+
+    실제 .env 가 data_source=live 여도 여기서는 mock 으로 고정해
+    외부(Korail/SRT) 의존 없이 결정적으로 동작하게 한다.
+    """
+    from app.config import get_settings
+    from app.providers.factory import reset_providers
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "data_source", "mock")
+    reset_providers()
+    yield
+    reset_providers()
 
 
 def test_index_page():

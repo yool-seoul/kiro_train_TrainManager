@@ -145,3 +145,65 @@
 - 계정 드롭다운 표시를 `masked()` → `label · PROVIDER · login_id` 로 변경(전체 아이디 노출).
 - 근본 원인: 실행 중이던 서버가 Turn 16의 gspread numericise_ignore 수정 이전 코드였음 → 서버 재시작으로 반영. 확인 결과 KTX 드롭다운에 `0860729075`(앞자리 0 유지) 정상 표시, 기본 날짜/시각 자동 채움.
 - pytest 11건 통과.
+
+## Turn 19 — 브랜치 내용 PR 생성 (PR #3)
+**사용자**: 브랜치 내용 PR 수행.
+
+**AI**: PR #2 는 이미 머지 확인(main 에 실연동 반영). 이후 커밋 c8659c3(날짜/시각 기본값 + 드롭다운 login_id) 만 브랜치에 남아 있어 새 PR 생성. **PR #3**: https://github.com/yool-seoul/kiro_train_TrainManager/pull/3 (main ← feature/live-integration).
+
+## Turn 20 — 메신저 알림 구현 (D8-1=c)
+**사용자**: 메신저 연동하여 알림 구현.
+
+**AI**:
+- `app/notify/` 패키지 추가: `Notifier` ABC + `build_reserved_message`, 채널 구현(`NullNotifier`/`ConsoleNotifier`/`TelegramNotifier`), `get_notifier` 팩토리.
+- Telegram 채널: 봇 토큰 + chat_id 로 sendMessage(urllib, 무의존성). 카카오는 후속 확장 포인트로 문서화.
+- `config.py`: notify_channel(none|telegram|console), telegram_bot_token/chat_id 추가. `.env.example` 갱신.
+- `WatchService`: 좌석 선점(RESERVED) 시 `_notify_reserved()` 호출(알림 실패는 감시 흐름 안 깨도록 예외 삼킴).
+- `tests/test_notify.py` 추가(메시지 빌드/notify 호출/팩토리 기본값). 전체 pytest 14건 통과. 앱 기동 정상.
+- 미커밋 상태. Telegram 실전송 테스트는 봇 토큰/chat_id 필요.
+
+## Turn 21 — 텔레그램 봇 생성/푸시 방법 안내
+**사용자**: 텔레그램 BotFather로 새 챗봇 생성하고 챗 푸시하는 방법 안내.
+
+**AI**:
+- 코드 변경 없음(안내만). 기존 `app/notify/channels.py`의 `TelegramNotifier`, `app/notify/factory.py`, `app/config.py`(notify_channel/telegram_bot_token/telegram_chat_id) 구조 확인 후 그에 맞춰 안내.
+- 단계 안내: ① @BotFather `/newbot`으로 봇 생성 → 봇 토큰 발급, ② 봇에 메시지 후 `getUpdates`로 chat_id 확인(그룹은 음수), ③ curl `sendMessage`로 푸시 테스트, ④ `.env`에 NOTIFY_CHANNEL=telegram / TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 설정 → factory가 TelegramNotifier 활성화(값 미비 시 NullNotifier로 비활성).
+- 시크릿(봇 토큰/chat_id) 값은 기록하지 않음. `.env` gitignore 확인 권고.
+
+## Turn 22 — 텔레그램 실전송 테스트
+**사용자**: 텔레그램 설정 완료, 위 시크릿으로 실제 전송 테스트 요청.
+
+**AI**:
+- `.env` 키 존재 확인(값 미노출): TRAINMGR_NOTIFY_CHANNEL / TRAINMGR_TELEGRAM_BOT_TOKEN / TRAINMGR_TELEGRAM_CHAT_ID.
+- venv(python 3.13.11)로 임시 스크립트 실행: `get_settings()` + `get_notifier()`로 앱의 실제 알림 경로를 통해 테스트 메시지 1건 전송.
+- 결과: notify_channel=telegram, bot_token/chat_id 설정됨(True/True), notifier=TelegramNotifier, **send=OK**(텔레그램 sendMessage 성공, ok=true). 실제 챗으로 테스트 메시지 도착.
+- 임시 파일(_notify_test.py, _notify_out.txt) 정리 완료. 시크릿 값은 기록/출력하지 않음.
+
+## Turn 23 — 실제 티켓 예약 완성을 위한 코드 개선
+**사용자**: 실제 티켓 예약까지 진행하도록 코드 개선.
+
+**AI**:
+- 사전 검증(실계정/네트워크 없이): 설치된 라이브러리 실제 시그니처/객체 속성 대조.
+  - KTX `Korail.reserve(train, passengers, option, try_waiting=False)`, SRT `SRT.reserve(train, passengers, special_seat, window_seat)` — 현재 호출과 일치(서명 버그 없음).
+  - 예약 응답 매핑: SRTReservation은 `arr_date` 없음이나 `getattr` 기본값으로 안전, korail2 Reservation도 안전(크래시 없음).
+  - **핵심 발견: `.env`의 TRAINMGR_DATA_SOURCE=mock → 현재는 실제 예약이 아니라 mock 예약**.
+- 코드 개선(변경):
+  1. `app/notify/base.py`: `build_reservation_message(reservation)` 추가, `build_reserved_message`가 이를 재사용, `Notifier.notify_reservation()` 추가. `__init__` export 갱신.
+  2. `app/providers/ktx.py`: `_seat_no(r)` 추가 — korail2 Reservation의 car_no/seat_no/seat_no_end로 "3호차 5A~6A" 형태 좌석번호 채움(기존엔 None으로 버림).
+  3. `app/api/routes.py`: 수동 예약(`/reserve`) 성공 시 `_notify_reservation_async()`로 텔레그램 알림을 백그라운드(daemon) 전송(응답 비차단, 실패는 삼킴).
+- 테스트: `test_live_providers`에 KTX 좌석번호 assert 추가, `test_notify`에 예약 메시지/`notify_reservation` 테스트 추가. **pytest 16건 통과**.
+- 미실행(사용자 확인 대기): 실제 live 전환(TRAINMGR_DATA_SOURCE=live) 및 실좌석 선점 테스트. 실좌석 선점은 되돌릴 수 있으나(취소 가능) 실제 재고를 점유하므로 실행 전 확인 필요.
+
+## Turn 24 — live 전환 + 실계정 예약 검증 + KTX 취소 버그 수정
+**사용자**: 1단계(live 전환) 후 2단계(실예약 테스트) 수행하고 결과 보고.
+
+**AI**:
+- 1단계: `.env` `TRAINMGR_DATA_SOURCE=mock → live` 로 변경.
+- 2단계: 앱과 동일한 `BookingService` 경로로 실계정 조회→선점→알림→즉시 취소 검증(3일 뒤 날짜).
+  - **SRT 완전 성공**: 수서→부산, 선점(8호차 12B, 52,200원, reserved, 구입기한 표시) → 텔레그램 알림 전송 → 취소 원복 정상.
+  - **KTX**: 선점은 성공(예약번호 발급, reserved)했으나 **취소 실패** → 실좌석이 잔류하는 문제 발생.
+- KTX 취소 실패 원인 규명: korail2-ncard `Korail.cancel()` 이 GET 요청 파라미터를 `data=`(본문)로 전송 → 서버 HTTP 400(비-JSON) → `json.loads` 크래시. 잔류 예약을 `params=`(쿼리스트링) 방식으로 재요청하여 즉시 취소(strResult=SUCC, 잔여 0) — **댕글링 예약 없음 확인**.
+- 코드 수정: `app/providers/ktx.py` 에 `_cancel_reservation()` 추가(라이브러리 버그 우회: `params=` 전송 + 결과코드 검증), `cancel()` 이 이를 사용.
+- 테스트: `test_live_providers` KTX fake 를 취소 우회 경로(_session/params, korail2.korail2.KORAIL_CANCEL)로 갱신. `test_app.py` 에 autouse `_force_mock` 픽스처 추가(live .env 에서도 통합 스모크는 mock 고정). **pytest 16건 통과**.
+- 최종 확인: 수정된 앱 경로로 KTX 선점→취소 재검증 성공(취소 cancelled, KTX 잔여 예약 []).
+- 현재 상태: 앱은 **live(실예약) 모드**. mock 복귀는 `.env` 의 DATA_SOURCE 를 mock 으로 되돌리면 됨. 임시 검증 스크립트/출력은 모두 삭제. 시크릿 값 미기록.

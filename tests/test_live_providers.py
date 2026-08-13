@@ -54,14 +54,43 @@ class FakeKorailReservation:
         self.arr_time = "114300"
         self.price = 59800
         self.seat_no_count = 1
+        self.car_no = "3"
+        self.seat_no = "5A"
+        self.seat_no_end = "6A"
         self.buy_limit_date = "20260901"
         self.buy_limit_time = "093000"
+        # 취소 요청에 필요한 필드
+        self.journey_no = "001"
+        self.journey_cnt = "01"
+        self.rsv_chg_no = "00"
+
+
+class _FakeResp:
+    def __init__(self, text):
+        self.text = text
+        self.status_code = 200
+
+
+class _FakeSession:
+    """cancel 우회 경로 검증용: params= 요청에 성공 JSON 반환."""
+
+    def __init__(self):
+        self.last_params = None
+
+    def get(self, url, params=None, data=None):
+        self.last_params = params
+        return _FakeResp('{"strResult":"SUCC","h_msg_cd":"IRG000000","h_msg_txt":"정상"}')
 
 
 class FakeKorailClient:
     def __init__(self):
         self.logined = True
         self.reserved = None
+        # _cancel_reservation 우회 경로가 사용하는 내부 속성
+        self._device = "AND"
+        self._version = "x"
+        self._key = "k"
+        self._session = _FakeSession()
 
     def search_train(self, *a, **k):
         return [FakeKorailTrain(general=True, special=True)]
@@ -72,9 +101,6 @@ class FakeKorailClient:
 
     def reservations(self):
         return [FakeKorailReservation()]
-
-    def cancel(self, obj):
-        return True
 
 
 @pytest.fixture
@@ -105,7 +131,14 @@ def fake_korail(monkeypatch):
     mod.AdultPassenger = _p("AdultPassenger")
     mod.ChildPassenger = _p("ChildPassenger")
     mod.SeniorPassenger = _p("SeniorPassenger")
+
+    # cancel 우회 경로가 참조하는 korail2.korail2.KORAIL_CANCEL 제공
+    sub = types.ModuleType("korail2.korail2")
+    sub.KORAIL_CANCEL = "http://fake/cancel"
+    mod.korail2 = sub
+
     monkeypatch.setitem(sys.modules, "korail2", mod)
+    monkeypatch.setitem(sys.modules, "korail2.korail2", sub)
     return mod
 
 
@@ -129,6 +162,7 @@ def test_ktx_search_and_reserve_mapping(fake_korail):
     res = provider.reserve(cred, t, passengers=Passengers(adults=1), seat_class=SeatClass.GENERAL)
     assert res.reservation_id == "KTX20260901001"
     assert res.fare == 59800
+    assert res.seat_no == "3호차 5A~6A"
     assert res.status is ReservationStatus.RESERVED
     assert res.deadline is not None
 
