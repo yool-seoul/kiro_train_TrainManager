@@ -131,3 +131,17 @@
 - 수정: `google_sheet_store._read_via_gspread` 에서 `get_all_records(numericise_ignore=["all"])` 로 모든 셀을 문자열 유지.
 - 재시험: KTX login_id 10자리(앞자리 0 유지) 확인, **KTX 실계정 로그인+조회 성공(10건)**. SRT 정상. 두 열차 모두 live 조회 동작 확인.
 - 전체 pytest 11건 통과.
+
+## Turn 17 — live-integration PR 생성
+**사용자**: PR 생성만 수행하고 다음 작업은 다시 확인.
+
+**AI**: GitHub REST API 로 PR 생성. **PR #2**: https://github.com/yool-seoul/kiro_train_TrainManager/pull/2 (main ← feature/live-integration). 후속 작업은 사용자 확인 대기.
+
+## Turn 18 — 조회 폼 날짜/시각 기본값 + 계정 드롭다운 login_id 표시 수정
+**사용자**: 조회/예약 화면 날짜·시각에 현재 기준 가장 가까운 미래 기본값 넣기. 계정 드롭다운의 login_id 가 제대로(특히 KTX 앞자리 0) 표시되도록 최신 의사결정 참고해 수정.
+
+**AI**:
+- `index` 라우트에 `_default_datetime()` 추가: 현재 시각 다음 30분 경계(항상 미래)로 default_date/default_time 계산 → `index.html` 날짜/시각 input value 로 주입.
+- 계정 드롭다운 표시를 `masked()` → `label · PROVIDER · login_id` 로 변경(전체 아이디 노출).
+- 근본 원인: 실행 중이던 서버가 Turn 16의 gspread numericise_ignore 수정 이전 코드였음 → 서버 재시작으로 반영. 확인 결과 KTX 드롭다운에 `0860729075`(앞자리 0 유지) 정상 표시, 기본 날짜/시각 자동 채움.
+- pytest 11건 통과.

@@ -45,11 +45,25 @@ def _render_error(request: Request, message: str, status_code: int = 400) -> HTM
 
 
 # ------------------------------------------------------------------- pages
+def _default_datetime():
+    """현재 시각 기준 가장 가까운 미래(다음 30분 경계)의 날짜/시각 기본값."""
+    from datetime import datetime, timedelta
+
+    now = datetime.now().replace(second=0, microsecond=0)
+    add = 30 - (now.minute % 30)  # 정각/30분이면 다음 경계로 (항상 미래)
+    nxt = now + timedelta(minutes=add)
+    return nxt.strftime("%Y-%m-%d"), nxt.strftime("%H:%M")
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     settings = get_settings()
     store = get_credential_store()
-    creds = store.list_credentials()
+    try:
+        creds = store.list_credentials()
+    except Exception:  # noqa: BLE001 - 자격증명 로드 실패 시에도 화면은 뜨게
+        creds = []
+    default_date, default_time = _default_datetime()
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -57,6 +71,8 @@ def index(request: Request) -> HTMLResponse:
             "settings": settings,
             "credentials": creds,
             "train_types": list(TrainType),
+            "default_date": default_date,
+            "default_time": default_time,
         },
     )
 

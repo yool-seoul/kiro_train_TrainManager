@@ -16,8 +16,8 @@
       </label>
       <label>출발역 <input name="dep" value="서울" required></label>
       <label>도착역 <input name="arr" value="부산" required></label>
-      <label>날짜 <input type="date" name="date" required></label>
-      <label>시각 <input type="time" name="time" value="09:00" required></label>
+      <label>날짜 <input type="date" name="date" value="{{ default_date }}" required></label>
+      <label>시각 <input type="time" name="time" value="{{ default_time }}" required></label>
       <label>좌석
         <select name="seat_class">
           <option value="general">일반실</option>
@@ -31,7 +31,7 @@
         <select name="credential_label">
           <option value="">(provider 기본 계정)</option>
           {% for c in credentials %}
-          <option value="{{ c.label }}">{{ c.label }} · {{ c.masked() }}</option>
+          <option value="{{ c.label }}">{{ c.label }} · {{ c.provider.value|upper }} · {{ c.login_id }}</option>
           {% endfor %}
         </select>
       </label>
