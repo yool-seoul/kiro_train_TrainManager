@@ -1,8 +1,8 @@
 <div class="card">
   <div class="results-head">
     <h2>조회 결과 ({{ trains|length }}건)</h2>
-    {# 좌석이 없어도 이 조건으로 자동 예약대기 등록 가능 #}
-    <form hx-post="/watch" hx-target="#results" hx-swap="afterend">
+    {# 조건 단위 자동 예약대기: 조건에 맞는 가장 이른 열차를 자동 선점 #}
+    <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
       <input type="hidden" name="train_type" value="{{ search.train_type }}">
       <input type="hidden" name="dep" value="{{ search.dep }}">
       <input type="hidden" name="arr" value="{{ search.arr }}">
@@ -26,6 +26,7 @@
     </thead>
     <tbody>
       {% for train in trains %}
+      {% set sold_out = not train.any_available %}
       <tr>
         <td>{{ train.train_name }}</td>
         <td>{{ train.dep_station }} {{ train.dep_time|fmt_time }}</td>
@@ -35,11 +36,33 @@
         <td>{{ train.general_fare|fmt_won }}</td>
         <td class="row-actions">
           {% set tj = train.model_dump_json() %}
+          {# 좌석 확인 (읽기 전용) #}
           <form hx-post="/seats" hx-target="#detail-{{ loop.index }}" hx-swap="innerHTML">
             <input type="hidden" name="train_json" value="{{ tj }}">
             <input type="hidden" name="available_only" value="true">
             <button type="submit" class="btn-sm">좌석 확인</button>
           </form>
+
+          {% if sold_out %}
+          {# 전 좌석 매진: 예약 불가 → 이 열차만 대기 #}
+          <button type="button" class="btn-sm" disabled title="전 좌석 매진">예약</button>
+          <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
+            <input type="hidden" name="train_type" value="{{ search.train_type }}">
+            <input type="hidden" name="dep" value="{{ search.dep }}">
+            <input type="hidden" name="arr" value="{{ search.arr }}">
+            <input type="hidden" name="date" value="{{ search.date }}">
+            <input type="hidden" name="time" value="{{ search.time }}">
+            <input type="hidden" name="seat_class" value="{{ search.seat_class }}">
+            <input type="hidden" name="adults" value="{{ search.adults }}">
+            <input type="hidden" name="children" value="{{ search.children }}">
+            <input type="hidden" name="seniors" value="{{ search.seniors }}">
+            <input type="hidden" name="credential_label" value="{{ credential_label }}">
+            <input type="hidden" name="target_train_id" value="{{ train.train_id }}">
+            <input type="hidden" name="target_train_name" value="{{ train.train_name }}">
+            <button type="submit" class="btn-sm btn-watch">대기</button>
+          </form>
+          {% else %}
+          {# 일부/전체 좌석 가능: 예약 #}
           <form hx-post="/reserve" hx-target="#detail-{{ loop.index }}" hx-swap="innerHTML"
                 hx-confirm="이 열차를 예약(선점)합니다. 진행할까요?">
             <input type="hidden" name="train_json" value="{{ tj }}">
@@ -48,11 +71,12 @@
             <input type="hidden" name="seniors" value="{{ passengers.seniors }}">
             <input type="hidden" name="credential_label" value="{{ credential_label }}">
             <select name="seat_class" class="sel-sm">
-              <option value="general">일반실</option>
-              <option value="special">특실</option>
+              <option value="general" {{ "disabled" if not train.general_available }}>일반실</option>
+              <option value="special" {{ "disabled" if not train.special_available }}>특실</option>
             </select>
             <button type="submit" class="btn-sm btn-primary">예약</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       <tr><td colspan="7"><div id="detail-{{ loop.index }}" class="detail"></div></td></tr>
@@ -60,4 +84,7 @@
     </tbody>
   </table>
   {% endif %}
+
+  {# 자동 예약대기 결과가 표시되는 패널 #}
+  <div id="watch-panel" class="watch-panel"></div>
 </div>

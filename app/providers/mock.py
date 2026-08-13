@@ -25,8 +25,9 @@ from app.schemas import (
     TrainType,
 )
 
-# 매진 열차가 폴링 1회마다 좌석이 풀릴 확률 (watch 시연용)
-_SEAT_RELEASE_PROBABILITY = 0.35
+# 매진 열차가 처음 조회된 뒤 좌석이 풀리기까지의 지연(초) 범위 (watch 시연용)
+_RELEASE_MIN_SEC = 5
+_RELEASE_MAX_SEC = 30
 
 
 def _seed(*parts: str) -> int:
@@ -44,6 +45,25 @@ class MockProvider(TrainProvider):
         self._reservations: dict[str, list[Reservation]] = {}
         self._lock = threading.Lock()
         self._counter = 0
+        # "train_id:class" -> 좌석이 풀리는 시각. 매진 열차가 처음 조회될 때 예약.
+        self._release_at: dict[str, datetime] = {}
+        self._release_lock = threading.Lock()
+
+    def _is_released(self, train_id: str, seat_class: str) -> bool:
+        """매진 좌석이 (시연용) 시간 경과로 풀렸는지 여부.
+
+        처음 조회되는 순간 5~30초 뒤 시각을 예약하고, 그 시각이 지나면 풀린다.
+        한 번 풀리면 계속 풀린 상태로 유지된다 → 재조회 시 열차 ID/상태 일관성 유지.
+        """
+        key = f"{train_id}:{seat_class}"
+        now = datetime.now()
+        with self._release_lock:
+            release_at = self._release_at.get(key)
+            if release_at is None:
+                delay = _RELEASE_MIN_SEC + _seed(key) % (_RELEASE_MAX_SEC - _RELEASE_MIN_SEC + 1)
+                release_at = now + timedelta(seconds=delay)
+                self._release_at[key] = release_at
+            return now >= release_at
 
     # ----------------------------------------------------------------- search
     def search(
@@ -63,23 +83,22 @@ class MockProvider(TrainProvider):
         except ValueError as exc:
             raise ProviderError(f"잘못된 날짜/시각 형식: {date} {time}", code="bad_input") from exc
 
-        rng = random.Random(_seed(self.train_type.value, dep, arr, date))
         prefix = "KTX" if self.train_type is TrainType.KTX else "SRT"
 
         options: list[TrainOption] = []
         n = min(limit, 8) if limit else 8
         for i in range(max(n, 1)):
+            # 열차별로 안정적인(deterministic) 시드 → 재조회 시 동일한 목록/ID 유지
+            rng = random.Random(_seed(self.train_type.value, dep, arr, date, str(i)))
             dep_time = base + timedelta(minutes=45 * i + rng.randint(0, 20))
             duration = timedelta(hours=2, minutes=rng.randint(30, 55))
             train_no = 100 + rng.randint(0, 400) + i
             train_id = f"{self.train_type.value}-{date}-{dep}-{arr}-{dep_time.strftime('%H%M')}"
 
-            # 약 40% 는 매진 상태로 시작 (watch 시연용)
-            general_avail = rng.random() > 0.4
-            special_avail = rng.random() > 0.6
-            # 매진 열차라도 폴링 중 확률적으로 좌석이 풀린다
-            if not general_avail and rng.random() < _SEAT_RELEASE_PROBABILITY:
-                general_avail = True
+            # 약 40%/60% 는 매진 상태로 시작.
+            # 매진이면 처음 조회된 뒤 일정 시간이 지나면 좌석이 풀린다(watch 시연용).
+            general_avail = rng.random() > 0.4 or self._is_released(train_id, "general")
+            special_avail = rng.random() > 0.6 or self._is_released(train_id, "special")
 
             general_fare = 20000 + rng.randint(0, 40) * 500
             options.append(

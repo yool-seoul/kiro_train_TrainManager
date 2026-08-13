@@ -1,0 +1,8 @@
+<div class="watch-inline">
+  <h3>자동 예약대기</h3>
+  {# 등록 직후부터 5초마다 상태 자동 갱신 #}
+  <div id="watch-list" hx-get="/watch/list" hx-trigger="load, every 5s" hx-swap="innerHTML">
+    {% include "partials/watch_list.html" %}
+  </div>
+  <p class="muted"><a href="/watch">자동 예약대기 전체 페이지 →</a></p>
+</div>
