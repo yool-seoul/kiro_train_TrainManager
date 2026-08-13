@@ -7,7 +7,7 @@ HTML 페이지 + HTMX 부분 렌더링을 제공한다.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
@@ -57,6 +57,68 @@ def index(request: Request) -> HTMLResponse:
             "settings": settings,
             "credentials": creds,
             "train_types": list(TrainType),
+        },
+    )
+
+
+@router.get("/credentials", response_class=HTMLResponse)
+def credentials_page(request: Request) -> HTMLResponse:
+    """자격증명 소스(Google Sheet 등) 읽기 상태 진단 페이지.
+
+    비밀번호는 화면/로그에 노출하지 않고 마스킹한다.
+    보안상 debug 모드에서만 접근 가능하다(운영에서는 404).
+    """
+    settings = get_settings()
+    if not settings.debug:
+        raise HTTPException(status_code=404)
+    from app.credentials import CredentialError, get_credential_store
+
+    # 서비스 계정 이메일(공유 대상 확인용, 시크릿 아님) 추출 시도
+    sa_email = None
+    if settings.google_service_account_file:
+        try:
+            import json
+
+            with open(settings.google_service_account_file, encoding="utf-8") as f:
+                sa_email = json.load(f).get("client_email")
+        except Exception:  # noqa: BLE001
+            sa_email = None
+
+    def _mask_id(sheet_id: str | None) -> str | None:
+        if not sheet_id:
+            return None
+        if len(sheet_id) <= 8:
+            return sheet_id[:2] + "…"
+        return f"{sheet_id[:4]}…{sheet_id[-4:]}"
+
+    rows: list[dict] = []
+    error = None
+    try:
+        store = get_credential_store()
+        for c in store.list_credentials():
+            rows.append(
+                {
+                    "provider": c.provider.value,
+                    "label": c.label or "",
+                    "login_id": c.login_id,
+                    "password_set": bool(c.password),
+                    "ncard": bool(c.ncard_no),
+                }
+            )
+    except CredentialError as exc:
+        error = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        error = f"{type(exc).__name__}: {exc}"
+
+    return templates.TemplateResponse(
+        request,
+        "credentials.html",
+        {
+            "settings": settings,
+            "rows": rows,
+            "error": error,
+            "sa_email": sa_email,
+            "spreadsheet_id_masked": _mask_id(settings.google_spreadsheet_id),
         },
     )
 

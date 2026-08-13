@@ -97,11 +97,38 @@ app/
 └── static/app.css
 ```
 
-## 실연동(live) 전환 시 할 일
+## 실연동(live) 전환
 
-1. `pip install korail2-ncard SRTrain pycryptodome`
-2. `app/providers/ktx.py`, `app/providers/srt.py` 의 메서드 구현 (search/seats/reserve/list_reservations/cancel)
-3. `TRAINMGR_DATA_SOURCE=live`, `TRAINMGR_CREDENTIAL_SOURCE=service_account`(또는 `csv_url`) 설정
+실제 Korail/SRT 연동은 구현되어 있습니다(`app/providers/ktx.py`, `app/providers/srt.py`).
+아래 설정만 하면 됩니다.
+
+1. 의존성 설치: `pip install -r requirements.txt` (korail2-ncard, SRTrain, pycryptodome 포함)
+2. Google Sheet 자격증명 준비 (위 "Google Spreadsheet 자격증명" 참고). 시트에 실제 KTX/SRT 계정 입력.
+3. 환경변수 설정:
+   ```bash
+   TRAINMGR_DATA_SOURCE=live
+   TRAINMGR_CREDENTIAL_SOURCE=service_account
+   TRAINMGR_GOOGLE_SERVICE_ACCOUNT_FILE=./secrets/service_account.json
+   TRAINMGR_GOOGLE_SPREADSHEET_ID=<시트 ID>
+   TRAINMGR_GOOGLE_WORKSHEET_NAME=credentials
+   ```
+
+### live 모드 구현 범위 / 제약
+
+- **지원**: 조회(search), 예약(reserve), 예약 목록(list), 취소(cancel), 자동 예약대기(watch)
+- **미지원(현재)**: 상세 좌석맵(호차별 좌석번호) — korail2/SRTrain 기본 API 가 제공하지 않음.
+  live 에서 "좌석 확인" 시 안내 메시지를 반환한다. (k-skill 헬퍼의 좌석상세 API 이식은 후속 과제)
+- **운임(fare)**: 두 라이브러리의 조회 응답에 운임이 없어 조회 목록에서는 미표시.
+  예약 완료 후 응답에는 실제 운임/구입기한이 포함된다.
+- **동시성**: 계정별로 로그인 client 를 캐시하고 계정별 Lock 으로 호출을 직렬화한다
+  (라이브러리 세션 공유/anti-bot 이슈 회피).
+
+### live 모드 주의 (중요)
+
+- `reserve` 는 **실제 좌석을 선점**한다. 자동 예약대기(watch)도 좌석이 나오면 **자동으로 실제 선점**한다.
+  구입기한 내 미결제 시 자동 취소되지만, 반복 예약/취소는 계정 제재 위험이 있으니 주의.
+- 폴링 주기는 기본 10초이며, anti-bot/계정 보호를 위해 과도한 감시는 피한다(하한 10초, 최대 감시 30분).
+- 결제는 자동화하지 않는다. 공식 앱/웹에서 결제한다.
 
 ## 주의사항
 

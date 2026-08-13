@@ -33,7 +33,13 @@ _SCOPES = [
 
 def _row_to_credential(row: dict[str, str]) -> Credential | None:
     """시트 한 행 → Credential. 필수값 없으면 None (빈 행 스킵)."""
-    norm = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+    def _s(x: object) -> str:
+        # gspread 는 숫자 셀을 int/float 로 반환하므로 문자열로 정규화한다.
+        if x is None:
+            return ""
+        return str(x).strip()
+
+    norm = {_s(k).lower(): _s(v) for k, v in row.items()}
     if not all(norm.get(k) for k in _REQUIRED):
         return None
     try:
@@ -104,7 +110,9 @@ class GoogleSheetCredentialStore(CredentialStore):
         client = gspread.authorize(creds)
         sheet = client.open_by_key(self._s.google_spreadsheet_id)
         worksheet = sheet.worksheet(self._s.google_worksheet_name)
-        return worksheet.get_all_records()  # 첫 행을 헤더로 사용
+        # numericise_ignore=['all']: 모든 셀을 문자열로 유지.
+        # (숫자로 변환되면 "0860..." 같은 아이디의 앞자리 0 이 사라진다)
+        return worksheet.get_all_records(numericise_ignore=["all"])  # 첫 행을 헤더로 사용
 
     def _read_via_csv(self) -> list[dict[str, str]]:
         if not self._s.google_csv_url:
