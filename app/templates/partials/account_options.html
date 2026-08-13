@@ -1,0 +1,5 @@
+{# 선택된 열차 종류(provider)에 해당하는 계정 옵션 목록 #}
+<option value="">(provider 기본 계정)</option>
+{% for c in credentials %}
+<option value="{{ c.label }}">{{ c.label }} · {{ c.provider.value|upper }} · {{ c.login_id }}</option>
+{% endfor %}

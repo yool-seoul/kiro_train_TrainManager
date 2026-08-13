@@ -20,7 +20,8 @@
       <td>
         {% if j.is_active %}
         {# 감시 중일 때만 중단 가능. 예약 완료(end waiting) 후에는 중단 버튼이 사라진다. #}
-        <form hx-post="/watch/stop" hx-target="#watch-list" hx-swap="innerHTML">
+        <form hx-post="/watch/stop" hx-target="#watch-list" hx-swap="innerHTML"
+              data-status="#watch-state">
           <input type="hidden" name="job_id" value="{{ j.job_id }}">
           <button type="submit" class="btn-sm btn-danger">중단</button>
         </form>

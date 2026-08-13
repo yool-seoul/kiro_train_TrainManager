@@ -6,7 +6,11 @@
     좌석이 없을 때 등록하면, 서버가 주기적으로 재조회하여 좌석이 생기는 즉시 자동으로 선점합니다.
     선점되면 아래 목록의 상태가 <strong>reserved</strong> 로 바뀌고 결제 안내가 표시됩니다.
   </p>
-  {# 5초마다 상태 자동 갱신 #}
+  {# 중단 요청의 상태를 표시 (공용 패턴). 폴링 갱신은 여기에 영향 주지 않음 #}
+  <div id="watch-state" class="req-state state-idle" aria-live="polite">
+    감시를 멈추려면 각 작업의 <b>중단</b> 버튼을 누르세요. 목록은 5초마다 자동 갱신됩니다.
+  </div>
+  {# 5초마다 상태 자동 갱신 (자동 폴링에는 data-status 를 두지 않는다) #}
   <div id="watch-list" hx-get="/watch/list" hx-trigger="load, every 5s" hx-swap="innerHTML">
     {% include "partials/watch_list.html" %}
   </div>

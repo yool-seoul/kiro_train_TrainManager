@@ -207,3 +207,44 @@
 - 테스트: `test_live_providers` KTX fake 를 취소 우회 경로(_session/params, korail2.korail2.KORAIL_CANCEL)로 갱신. `test_app.py` 에 autouse `_force_mock` 픽스처 추가(live .env 에서도 통합 스모크는 mock 고정). **pytest 16건 통과**.
 - 최종 확인: 수정된 앱 경로로 KTX 선점→취소 재검증 성공(취소 cancelled, KTX 잔여 예약 []).
 - 현재 상태: 앱은 **live(실예약) 모드**. mock 복귀는 `.env` 의 DATA_SOURCE 를 mock 으로 되돌리면 됨. 임시 검증 스크립트/출력은 모두 삭제. 시크릿 값 미기록.
+
+## Turn 25 — 브랜치 커밋 & PR 생성 (PR #4)
+**사용자**: 현재 코드를 브랜치로 커밋하고 PR.
+
+**AI**:
+- `.env` 가 `.gitignore`(9행)로 제외됨 확인 → 시크릿 미커밋.
+- 새 브랜치 `feature/real-reservation-notify` 생성. 관련 파일만 스테이징(.env 제외):
+  app/api/routes.py, app/config.py, app/providers/ktx.py, app/services/watch.py, app/notify/(신규), tests/test_app.py, tests/test_live_providers.py, tests/test_notify.py(신규), .env.example, audit.md.
+- 커밋 `a0e66f5` (작성자 Luke Skywalker, 전역 config 미변경 `-c` 사용). 13 files changed, +476/-5.
+- origin 에 push + 업스트림 설정.
+- gh CLI 부재 → 저장된 자격증명 토큰으로 GitHub REST API 호출(토큰 미노출). **PR #4 생성**: https://github.com/yool-seoul/kiro_train_TrainManager/pull/4 (main ← feature/real-reservation-notify).
+
+## Turn 26 — 조회값이 실제와 다른 원인 규명(서버가 mock 서빙) + live 재시작
+**사용자**: 서버에서 조회한 값이 실제 KTX/SRT 앱과 달라 live 연동 여부 확인 요청.
+
+**AI**:
+- 원인: 실행 중이던 서버(PID 16579, 16:14 시작)가 `.env`를 live로 바꾸기 **이전**에 기동돼 data_source=mock 을 캐시. 설정은 `.env`가 아니라 프로세스 시작 시점에 고정됨.
+- 확인: 실행 서버 `/search`(SRT 수서→부산) 응답이 운임이 채워진(20,000원 등, mock 요금공식과 일치) 무작위 열차번호(439/489/194…) = mock 데이터.
+- `.env` 인라인 주석(`live    # ...`)은 pydantic-settings가 무시하고 `data_source='live'`로 정상 파싱됨(신규 프로세스 확인).
+- 조치: 기존 서버(16579) 종료 후 live 설정으로 uvicorn 재기동(term id 관리). 재조회 결과: SRT 열차번호 309/311/313/…/9325(실제 운행번호 패턴), 운임 표시 0건(live는 general_fare=None) → **live 정상 동작 확인**.
+- 임시 파일 정리. 시크릿 미기록.
+
+## Turn 27 — 조회 화면 UI 개선 3건
+**사용자**: (1) 열차 종류 선택 시 해당 열차 계정만 드롭다운 노출, (2) 좌석 일반실/특실 선택 시 결과도 선택 등급만 표시 + '모두' 항목 추가, (3) 조회 요청 상태(미클릭/전송중/응답대기/성공/실패) 구분 UI.
+
+**AI**:
+- (1) `GET /accounts?train_type=` 라우트 + `partials/account_options.html` 신규. `index.html` 의 열차 select 에 `hx-get="/accounts" → #cred-select` 로 provider 별 계정만 갱신. index 라우트는 기본(첫 번째) 열차 종류 계정만 초기 노출. 검증: ktx→0860729075, srt→2185850814 만 각각 노출.
+- (2) 좌석 select 에 '모두(all)' 추가(기본값). `/search` 는 `seat_class` 를 str 로 받아 `seat_filter(all|general|special)` 계산, 예약/대기 기본 등급은 구체값(default_class)로 유지. `results.html` 을 `show_general/show_special` 조건부 컬럼 + 동적 colspan + 선택 등급 기준 예약/대기 버튼으로 재작성. 검증: general→일반실 컬럼만, special→특실만, all→둘 다.
+- (3) `index.html` 에 상태 배너 `#search-state` + `searchState()` 스크립트 + HTMX 이벤트(`before-request/after-request/send-error`) + `hx-disabled-elt` 로 미클릭/전송중/성공/HTTP오류/네트워크오류를 구분 표시. provider 오류는 `_render_error(status_code=200)` 로 반환해 HTMX 가 `#results` 에 에러 카드를 렌더(기존엔 4xx라 미표시). `app.css` 에 상태별 스타일 추가. 검증: 잘못된 역명 요청 → HTTP 200 + alert-error 본문.
+- 회귀: pytest 16건 통과. 서버 재시작(코드/템플릿 반영) 후 실제 엔드포인트로 위 3건 확인. 임시 파일 정리, 시크릿 미기록.
+
+## Turn 28 — 요청 상태 표시 패턴을 다른 화면에 공용 적용
+**사용자**: 다른 화면에도 같은 상태 표시 패턴 적용.
+
+**AI**:
+- 공용화: `base.html` 에 전역 HTMX 리스너(`htmx:beforeRequest/afterRequest/sendError`) 추가. 요청 요소(또는 조상)에 `data-status="#대상"` 만 선언하면 sending/done/httperror/neterror 를 자동 표시. `app.css` 의 `.search-state` → `.req-state` 로 일반화.
+- index: 개별 인라인 스크립트/`hx-on` 제거하고 `data-status="#search-state"` 로 전환(동작 동일).
+- 예약 내역(reservations.html): `#reservation-state` 배너 추가, `#reservation-list` 에 `data-status` 부여 → 내부 취소 폼들이 상태 공유.
+- 자동 예약대기(watch.html): `#watch-state` 배너 추가. 폴링 컨테이너 `#watch-list` 에는 data-status 를 두지 않아 5초 자동 갱신이 배너를 깜빡이지 않음. 중단(stop) 폼(watch_list.html)에만 `data-status="#watch-state"` 부여.
+- 에러 가시성 통일: `_render_error` 기본 status_code 400 → 200. HTMX 가 비-2xx 를 스왑하지 않아 조각 요청(취소/좌석/예약) 오류가 안 보이던 문제 해결(대상 영역에 에러 카드 노출).
+- 검증: pytest 16건 통과. 서버 재시작 후 /, /reservations, /watch 렌더 확인(공용 스크립트 로딩, 각 상태 배너, watch 폴링 컨테이너에 data-status 없음). 임시 파일 정리, 시크릿 미기록.

@@ -1,6 +1,12 @@
+{# 선택한 좌석 등급만 표시. seat_filter: all | general | special #}
+{% set show_general = seat_filter in ['all', 'general'] %}
+{% set show_special = seat_filter in ['all', 'special'] %}
+{# 컬럼 수: 열차, 출발, 도착, [일반실], [특실], 운임, 동작 #}
+{% set ncols = 5 + (1 if show_general else 0) + (1 if show_special else 0) %}
+{% set filter_label = {'all': '모두', 'general': '일반실', 'special': '특실'}[seat_filter] %}
 <div class="card">
   <div class="results-head">
-    <h2>조회 결과 ({{ trains|length }}건)</h2>
+    <h2>조회 결과 ({{ trains|length }}건) · 좌석: {{ filter_label }}</h2>
     {# 조건 단위 자동 예약대기: 조건에 맞는 가장 이른 열차를 자동 선점 #}
     <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
       <input type="hidden" name="train_type" value="{{ search.train_type }}">
@@ -22,18 +28,31 @@
   {% else %}
   <table class="trains">
     <thead>
-      <tr><th>열차</th><th>출발</th><th>도착</th><th>일반실</th><th>특실</th><th>운임(일반)</th><th>동작</th></tr>
+      <tr>
+        <th>열차</th><th>출발</th><th>도착</th>
+        {% if show_general %}<th>일반실</th>{% endif %}
+        {% if show_special %}<th>특실</th>{% endif %}
+        <th>운임</th><th>동작</th>
+      </tr>
     </thead>
     <tbody>
       {% for train in trains %}
-      {% set sold_out = not train.any_available %}
+      {# 선택한 등급 기준으로 예약 가능 여부 판단 #}
+      {% set row_general_ok = show_general and train.general_available %}
+      {% set row_special_ok = show_special and train.special_available %}
+      {% set reservable = row_general_ok or row_special_ok %}
+      {% set fare = train.general_fare if show_general else train.special_fare %}
       <tr>
         <td>{{ train.train_name }}</td>
         <td>{{ train.dep_station }} {{ train.dep_time|fmt_time }}</td>
         <td>{{ train.arr_station }} {{ train.arr_time|fmt_time }}</td>
+        {% if show_general %}
         <td>{% if train.general_available %}<span class="ok">가능</span>{% else %}<span class="no">매진</span>{% endif %}</td>
+        {% endif %}
+        {% if show_special %}
         <td>{% if train.special_available %}<span class="ok">가능</span>{% else %}<span class="no">매진</span>{% endif %}</td>
-        <td>{{ train.general_fare|fmt_won }}</td>
+        {% endif %}
+        <td>{{ fare|fmt_won if fare else "-" }}</td>
         <td class="row-actions">
           {% set tj = train.model_dump_json() %}
           {# 좌석 확인 (읽기 전용) #}
@@ -43,9 +62,9 @@
             <button type="submit" class="btn-sm">좌석 확인</button>
           </form>
 
-          {% if sold_out %}
-          {# 전 좌석 매진: 예약 불가 → 이 열차만 대기 #}
-          <button type="button" class="btn-sm" disabled title="전 좌석 매진">예약</button>
+          {% if not reservable %}
+          {# 선택 등급이 매진: 예약 불가 → 이 열차만 대기 #}
+          <button type="button" class="btn-sm" disabled title="선택하신 좌석 등급 매진">예약</button>
           <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
             <input type="hidden" name="train_type" value="{{ search.train_type }}">
             <input type="hidden" name="dep" value="{{ search.dep }}">
@@ -62,7 +81,7 @@
             <button type="submit" class="btn-sm btn-watch">대기</button>
           </form>
           {% else %}
-          {# 일부/전체 좌석 가능: 예약 #}
+          {# 예약 가능: 선택 등급만 예약 대상으로 노출 #}
           <form hx-post="/reserve" hx-target="#detail-{{ loop.index }}" hx-swap="innerHTML"
                 hx-confirm="이 열차를 예약(선점)합니다. 진행할까요?">
             <input type="hidden" name="train_json" value="{{ tj }}">
@@ -71,15 +90,15 @@
             <input type="hidden" name="seniors" value="{{ passengers.seniors }}">
             <input type="hidden" name="credential_label" value="{{ credential_label }}">
             <select name="seat_class" class="sel-sm">
-              <option value="general" {{ "disabled" if not train.general_available }}>일반실</option>
-              <option value="special" {{ "disabled" if not train.special_available }}>특실</option>
+              {% if show_general %}<option value="general" {{ "disabled" if not train.general_available }}>일반실</option>{% endif %}
+              {% if show_special %}<option value="special" {{ "disabled" if not train.special_available }}>특실</option>{% endif %}
             </select>
             <button type="submit" class="btn-sm btn-primary">예약</button>
           </form>
           {% endif %}
         </td>
       </tr>
-      <tr><td colspan="7"><div id="detail-{{ loop.index }}" class="detail"></div></td></tr>
+      <tr><td colspan="{{ ncols }}"><div id="detail-{{ loop.index }}" class="detail"></div></td></tr>
       {% endfor %}
     </tbody>
   </table>
