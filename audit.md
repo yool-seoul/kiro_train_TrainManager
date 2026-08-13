@@ -248,3 +248,24 @@
 - 자동 예약대기(watch.html): `#watch-state` 배너 추가. 폴링 컨테이너 `#watch-list` 에는 data-status 를 두지 않아 5초 자동 갱신이 배너를 깜빡이지 않음. 중단(stop) 폼(watch_list.html)에만 `data-status="#watch-state"` 부여.
 - 에러 가시성 통일: `_render_error` 기본 status_code 400 → 200. HTMX 가 비-2xx 를 스왑하지 않아 조각 요청(취소/좌석/예약) 오류가 안 보이던 문제 해결(대상 영역에 에러 카드 노출).
 - 검증: pytest 16건 통과. 서버 재시작 후 /, /reservations, /watch 렌더 확인(공용 스크립트 로딩, 각 상태 배너, watch 폴링 컨테이너에 data-status 없음). 임시 파일 정리, 시크릿 미기록.
+
+## Turn 29 — UI 개선 커밋 & PR 생성 (PR #5)
+**사용자**: 커밋/PR 수행.
+
+**AI**:
+- `.env` gitignore 확인(시크릿 미커밋). 새 브랜치 `feature/search-ui-improvements` 생성(현재 HEAD=feature/real-reservation-notify 위).
+- UI 관련 파일만 스테이징 후 커밋 `24ba169`(작성자 Luke Skywalker, 전역 config 미변경). 10 files changed, +188/-30. (routes.py, app.css, base.html, index.html, results.html, watch_list.html, account_options.html[신규], reservations.html, watch.html, audit.md)
+- origin push + 업스트림 설정.
+- REST API 로 **PR #5 생성**: https://github.com/yool-seoul/kiro_train_TrainManager/pull/5. base=`feature/real-reservation-notify`로 스택해 UI 변경만 diff에 포함(PR #4 병합 시 base 자동 재지정).
+
+## Turn 30 — PR #5 main 재지정·머지 및 브랜치 정리
+**사용자**: (직전 분석의) 1~4 작업 수행.
+
+**AI**:
+- 확인: PR #4는 이미 merge commit(`71dd2c4`)로 main 병합됨. PR #5는 base가 여전히 `feature/real-reservation-notify`(자동 재지정 안 됨: base 브랜치 미삭제).
+- 1) PR #5 base를 `main`으로 PATCH 재지정.
+- 2) 검증: base=main, mergeable_state=clean, 커밋 1개(`24ba169`)만, 10 files +188/-30 (UI 변경만).
+- 3) PR #5 머지(merge commit `75d9bce`). origin/main 에 UI 변경 반영 확인(account_options.html/base.html req-state 존재).
+- 4) 머지된 브랜치 3개 원격 삭제(HTTP 204): feature/search-ui-improvements, feature/real-reservation-notify, feature/live-integration.
+- 로컬 정리: 커밋 안 된 audit.md(이전 턴 기록)는 stash로 보존 후 `main` 을 origin/main(75d9bce)으로 fast-forward, 로컬 병합 브랜치 삭제, stash 복원. (레포 자격증명 토큰 사용, 값 미노출)
+- 남은 정리 후보: origin/feature/watch-soldout-ux(PR #1 잔재). audit.md 변경은 직접 main push 지양 위해 미커밋 상태로 보존.
