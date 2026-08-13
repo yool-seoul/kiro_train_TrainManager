@@ -54,6 +54,8 @@ class WatchService:
         passengers: Passengers,
         seat_class: SeatClass = SeatClass.GENERAL,
         credential_label: str | None = None,
+        target_train_id: str | None = None,
+        target_train_name: str | None = None,
     ) -> WatchJob:
         settings = get_settings()
         with self._lock:
@@ -75,10 +77,16 @@ class WatchService:
             passengers=passengers,
             seat_class=seat_class,
             credential_label=credential_label,
+            target_train_id=target_train_id,
+            target_train_name=target_train_name,
             status=WatchStatus.WATCHING,
             created_at=now,
             expires_at=now + timedelta(seconds=settings.watch_max_duration_sec),
-            message="좌석을 감시하는 중입니다.",
+            message=(
+                f"{target_train_name} 좌석을 감시하는 중입니다."
+                if target_train_name
+                else "좌석을 감시하는 중입니다."
+            ),
         )
         stop_event = threading.Event()
         with self._lock:
@@ -90,16 +98,23 @@ class WatchService:
         return job
 
     def stop(self, job_id: str) -> WatchJob | None:
+        """감시 중인 작업만 중단한다.
+
+        이미 예약 완료(RESERVED)되었거나 종료(EXPIRED/FAILED/STOPPED)된 작업은
+        중단 대상이 아니다 → 상태를 바꾸지 않고 그대로 반환한다.
+        (예약이 성사된 뒤에는 대기를 취소할 수 없어야 하므로.)
+        """
         with self._lock:
             job = self._jobs.get(job_id)
             event = self._stop_events.get(job_id)
         if job is None:
             return None
+        if job.status is not WatchStatus.WATCHING:
+            return job
         if event is not None:
             event.set()
-        if job.status is WatchStatus.WATCHING:
-            job.status = WatchStatus.STOPPED
-            job.message = "사용자가 감시를 중단했습니다."
+        job.status = WatchStatus.STOPPED
+        job.message = "사용자가 감시를 중단했습니다."
         return job
 
     # -------------------------------------------------------------- internal
@@ -129,7 +144,7 @@ class WatchService:
                     credential_label=job.credential_label,
                     include_no_seats=False,
                 )
-                candidate = self._pick(trains, job.seat_class)
+                candidate = self._pick(trains, job.seat_class, job.target_train_id)
                 if candidate is not None:
                     reservation = booking.reserve(
                         candidate,
@@ -153,12 +168,30 @@ class WatchService:
                 return
 
     @staticmethod
-    def _pick(trains: list[TrainOption], seat_class: SeatClass) -> TrainOption | None:
-        """희망 좌석 등급이 가능한 가장 이른 열차 선택."""
+    def _pick(
+        trains: list[TrainOption],
+        seat_class: SeatClass,
+        target_train_id: str | None = None,
+    ) -> TrainOption | None:
+        """예약할 열차 선택.
+
+        - target_train_id 가 있으면 그 열차만 대상으로 하고, 해당 좌석 등급이
+          가능해질 때까지 기다린다(가능하면 반환).
+        - 없으면 희망 좌석 등급이 가능한 가장 이른 열차를 선택한다.
+        """
+        def _has_class(train: TrainOption) -> bool:
+            if seat_class is SeatClass.SPECIAL:
+                return train.special_available
+            return train.general_available
+
+        if target_train_id is not None:
+            for train in trains:
+                if train.train_id == target_train_id and _has_class(train):
+                    return train
+            return None
+
         for train in sorted(trains, key=lambda t: t.dep_time):
-            if seat_class is SeatClass.GENERAL and train.general_available:
-                return train
-            if seat_class is SeatClass.SPECIAL and train.special_available:
+            if _has_class(train):
                 return train
         return None
 

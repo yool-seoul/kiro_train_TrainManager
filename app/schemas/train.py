@@ -157,6 +157,9 @@ class WatchJob(BaseModel):
     passengers: Passengers
     seat_class: SeatClass = SeatClass.GENERAL
     credential_label: str | None = None
+    # 특정 열차 대기 시 지정 (없으면 조건에 맞는 가장 이른 열차를 자동 선택)
+    target_train_id: str | None = None
+    target_train_name: str | None = None
     status: WatchStatus = WatchStatus.WATCHING
     created_at: datetime = Field(default_factory=datetime.now)
     expires_at: datetime | None = None
@@ -164,3 +167,19 @@ class WatchJob(BaseModel):
     attempts: int = 0
     reservation: Reservation | None = None     # 선점 성공 시 채워짐
     message: str | None = None                 # 상태 설명/오류 메시지
+
+    @property
+    def is_active(self) -> bool:
+        """아직 감시 중이라 중단할 수 있는 상태인지."""
+        return self.status is WatchStatus.WATCHING
+
+    @property
+    def status_label(self) -> str:
+        """화면 표시용 상태 라벨 (감시 종료 여부가 드러나도록)."""
+        return {
+            WatchStatus.WATCHING: "감시 중 (waiting)",
+            WatchStatus.RESERVED: "예약됨 · 대기 종료 (end waiting)",
+            WatchStatus.STOPPED: "대기 중단 (end waiting)",
+            WatchStatus.EXPIRED: "대기 만료 · 종료 (end waiting)",
+            WatchStatus.FAILED: "실패 · 종료 (end waiting)",
+        }.get(self.status, self.status.value)

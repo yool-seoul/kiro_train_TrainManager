@@ -11,18 +11,21 @@
       <td>{{ j.train_type.value|upper }} {{ j.dep_station }} → {{ j.arr_station }}</td>
       <td>{{ j.date }} {{ j.time[:4] }}</td>
       <td>{{ "특실" if j.seat_class.value == "special" else "일반실" }}</td>
-      <td><span class="wbadge wbadge-{{ j.status.value }}">{{ j.status.value }}</span></td>
+      <td><span class="wbadge wbadge-{{ j.status.value }}">{{ j.status_label }}</span></td>
       <td>{{ j.attempts }}</td>
       <td>
         {{ j.message }}
         {% if j.reservation %}<br><strong>{{ j.reservation.reservation_id }}</strong> · {{ j.reservation.fare|fmt_won }}{% endif %}
       </td>
       <td>
-        {% if j.status.value == "watching" %}
+        {% if j.is_active %}
+        {# 감시 중일 때만 중단 가능. 예약 완료(end waiting) 후에는 중단 버튼이 사라진다. #}
         <form hx-post="/watch/stop" hx-target="#watch-list" hx-swap="innerHTML">
           <input type="hidden" name="job_id" value="{{ j.job_id }}">
           <button type="submit" class="btn-sm btn-danger">중단</button>
         </form>
+        {% else %}
+        <span class="muted">—</span>
         {% endif %}
       </td>
     </tr>

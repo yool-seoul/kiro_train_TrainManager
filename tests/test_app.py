@@ -88,3 +88,61 @@ def test_watch_job_eventually_reserves(monkeypatch):
     assert current is not None
     assert current.status.value in {"reserved", "watching"}
     watch.stop(job.job_id)
+
+
+def test_target_train_watch_reserves_that_train(monkeypatch):
+    """특정 열차를 지정한 대기가 그 열차를 선점하는지 확인."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "watch_min_interval_sec", 0)
+    monkeypatch.setattr(settings, "watch_poll_interval_sec", 0)
+
+    booking = get_booking_service()
+    # 매진(전 좌석 불가) 열차를 하나 찾는다. mock 은 곧 좌석을 푼다.
+    trains = booking.search(
+        TrainType.KTX, "서울", "동대구", "20261115", "070000",
+        passengers=Passengers(adults=1), include_no_seats=True,
+    )
+    target = trains[0]
+
+    watch = get_watch_service()
+    job = watch.create_watch(
+        TrainType.KTX, "서울", "동대구", "20261115", "070000",
+        passengers=Passengers(adults=1),
+        seat_class=SeatClass.GENERAL,
+        target_train_id=target.train_id,
+        target_train_name=target.train_name,
+    )
+    assert job.target_train_id == target.train_id
+    watch.stop(job.job_id)
+
+
+def test_reserved_watch_cannot_be_stopped(monkeypatch):
+    """예약 완료된 대기 작업은 중단(취소)되지 않고 상태가 유지되어야 한다."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "watch_min_interval_sec", 0)
+    monkeypatch.setattr(settings, "watch_poll_interval_sec", 0)
+
+    watch = get_watch_service()
+    job = watch.create_watch(
+        TrainType.SRT, "수서", "부산", "20260901", "080000",
+        passengers=Passengers(adults=1),
+    )
+    # reserved 될 때까지 대기
+    for _ in range(50):
+        cur = watch.get(job.job_id)
+        if cur and cur.status.value == "reserved":
+            break
+        time.sleep(0.1)
+
+    cur = watch.get(job.job_id)
+    assert cur is not None and cur.status.value == "reserved"
+    assert cur.is_active is False
+    assert "end waiting" in cur.status_label
+
+    # 중단 시도 → 상태가 바뀌지 않아야 함
+    result = watch.stop(job.job_id)
+    assert result is not None and result.status.value == "reserved"

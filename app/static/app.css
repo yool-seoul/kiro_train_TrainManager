@@ -76,4 +76,8 @@ table.trains th, table.trains td { padding: 8px; border-bottom: 1px solid var(--
 .wbadge-reserved { background: #e7f6ec; color: var(--ok); }
 .wbadge-stopped, .wbadge-expired { background: #f1f1f1; color: #555; }
 .wbadge-failed { background: #fef2f2; color: var(--no); }
+.watch-panel:empty { display: none; }
+.watch-inline { margin-top: 16px; padding-top: 12px; border-top: 2px dashed var(--line); }
+.watch-inline h3 { font-size: 15px; margin: 0 0 8px; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 .footer { text-align: center; padding: 20px; color: var(--muted); }

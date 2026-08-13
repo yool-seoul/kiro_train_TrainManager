@@ -223,6 +223,8 @@ def create_watch(
     children: int = Form(0),
     seniors: int = Form(0),
     credential_label: str | None = Form(None),
+    target_train_id: str | None = Form(None),
+    target_train_name: str | None = Form(None),
 ) -> HTMLResponse:
     watch = get_watch_service()
     try:
@@ -235,11 +237,13 @@ def create_watch(
             passengers=_passengers(adults, children, seniors),
             seat_class=seat_class,
             credential_label=credential_label or None,
+            target_train_id=target_train_id or None,
+            target_train_name=target_train_name or None,
         )
     except ProviderError as exc:
         return _render_error(request, exc.message)
     return templates.TemplateResponse(
-        request, "partials/watch_list.html", {"jobs": watch.list_jobs()}
+        request, "partials/watch_panel.html", {"jobs": watch.list_jobs()}
     )
 
 
