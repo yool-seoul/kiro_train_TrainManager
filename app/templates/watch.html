@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>자동 예약대기</h1>
+  <p class="muted">
+    좌석이 없을 때 등록하면, 서버가 주기적으로 재조회하여 좌석이 생기는 즉시 자동으로 선점합니다.
+    선점되면 아래 목록의 상태가 <strong>reserved</strong> 로 바뀌고 결제 안내가 표시됩니다.
+  </p>
+  {# 5초마다 상태 자동 갱신 #}
+  <div id="watch-list" hx-get="/watch/list" hx-trigger="load, every 5s" hx-swap="innerHTML">
+    {% include "partials/watch_list.html" %}
+  </div>
+</section>
+{% endblock %}

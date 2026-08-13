@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>예약 내역</h1>
+  <div id="reservation-list">
+    {% include "partials/reservation_list.html" %}
+  </div>
+</section>
+{% endblock %}

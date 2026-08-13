@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>열차 좌석 조회 · 예약</h1>
+  <form id="search-form"
+        hx-post="/search"
+        hx-target="#results"
+        hx-indicator="#loading">
+    <div class="grid">
+      <label>열차
+        <select name="train_type">
+          {% for t in train_types %}
+          <option value="{{ t.value }}">{{ t.value|upper }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>출발역 <input name="dep" value="서울" required></label>
+      <label>도착역 <input name="arr" value="부산" required></label>
+      <label>날짜 <input type="date" name="date" required></label>
+      <label>시각 <input type="time" name="time" value="09:00" required></label>
+      <label>좌석
+        <select name="seat_class">
+          <option value="general">일반실</option>
+          <option value="special">특실</option>
+        </select>
+      </label>
+      <label>어른 <input type="number" name="adults" value="1" min="0" max="9"></label>
+      <label>어린이 <input type="number" name="children" value="0" min="0" max="9"></label>
+      <label>경로 <input type="number" name="seniors" value="0" min="0" max="9"></label>
+      <label>계정
+        <select name="credential_label">
+          <option value="">(provider 기본 계정)</option>
+          {% for c in credentials %}
+          <option value="{{ c.label }}">{{ c.label }} · {{ c.masked() }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="submit">조회</button>
+      <span id="loading" class="htmx-indicator">조회 중…</span>
+    </div>
+  </form>
+</section>
+
+<section id="results"></section>
+{% endblock %}

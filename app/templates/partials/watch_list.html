@@ -1,0 +1,32 @@
+{% if not jobs %}
+<p class="muted">등록된 자동 예약대기가 없습니다. 조회 화면에서 "자동 예약대기 등록"을 사용하세요.</p>
+{% else %}
+<table class="trains">
+  <thead>
+    <tr><th>구간</th><th>날짜/시각</th><th>좌석</th><th>상태</th><th>시도</th><th>메시지</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for j in jobs %}
+    <tr class="wstatus-{{ j.status.value }}">
+      <td>{{ j.train_type.value|upper }} {{ j.dep_station }} → {{ j.arr_station }}</td>
+      <td>{{ j.date }} {{ j.time[:4] }}</td>
+      <td>{{ "특실" if j.seat_class.value == "special" else "일반실" }}</td>
+      <td><span class="wbadge wbadge-{{ j.status.value }}">{{ j.status.value }}</span></td>
+      <td>{{ j.attempts }}</td>
+      <td>
+        {{ j.message }}
+        {% if j.reservation %}<br><strong>{{ j.reservation.reservation_id }}</strong> · {{ j.reservation.fare|fmt_won }}{% endif %}
+      </td>
+      <td>
+        {% if j.status.value == "watching" %}
+        <form hx-post="/watch/stop" hx-target="#watch-list" hx-swap="innerHTML">
+          <input type="hidden" name="job_id" value="{{ j.job_id }}">
+          <button type="submit" class="btn-sm btn-danger">중단</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

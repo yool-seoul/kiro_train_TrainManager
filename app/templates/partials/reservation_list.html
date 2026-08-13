@@ -1,0 +1,32 @@
+{% if not reservations %}
+<p class="muted">예약 내역이 없습니다.</p>
+{% else %}
+<table class="trains">
+  <thead>
+    <tr><th>예약번호</th><th>열차</th><th>구간</th><th>출발</th><th>좌석</th><th>운임</th><th>상태</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for r in reservations %}
+    <tr class="status-{{ r.status.value }}">
+      <td>{{ r.reservation_id }}</td>
+      <td>{{ r.train_name }}</td>
+      <td>{{ r.dep_station }} → {{ r.arr_station }}</td>
+      <td>{{ r.dep_time|fmt_time }}</td>
+      <td>{{ "특실" if r.seat_class.value == "special" else "일반실" }} {{ r.seat_no }}</td>
+      <td>{{ r.fare|fmt_won }}</td>
+      <td>{{ r.status.value }}</td>
+      <td>
+        {% if r.status.value == "reserved" %}
+        <form hx-post="/reservations/cancel" hx-target="#reservation-list" hx-swap="innerHTML"
+              hx-confirm="예약을 취소할까요?">
+          <input type="hidden" name="train_type" value="{{ r.train_type.value }}">
+          <input type="hidden" name="reservation_id" value="{{ r.reservation_id }}">
+          <button type="submit" class="btn-sm btn-danger">취소</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

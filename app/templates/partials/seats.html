@@ -1,0 +1,19 @@
+<div class="seats-box">
+  <h4>{{ train.train_name }} 좌석 상세</h4>
+  {% for car in cars %}
+  <div class="car">
+    <strong>{{ car.car_no }}호차</strong>
+    <span class="badge">{{ "특실" if car.seat_class.value == "special" else "일반실" }}</span>
+    <span class="muted">잔여 {{ car.available_seat_count }}석</span>
+    <div class="seat-list">
+      {% for s in car.seats if s.is_available %}
+        <span class="seat" title="{{ s.direction }}/{{ s.position }}{% if s.power_outlet and s.power_outlet != 'none' %} · 콘센트{% endif %}">
+          {{ s.seat_no }}{% if s.power_outlet and s.power_outlet != 'none' %}⚡{% endif %}
+        </span>
+      {% else %}
+        <span class="muted">잔여 좌석 없음</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>

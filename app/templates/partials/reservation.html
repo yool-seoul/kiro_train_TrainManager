@@ -1,0 +1,12 @@
+<div class="reservation-result">
+  <h4>✅ 좌석 선점 완료</h4>
+  <ul>
+    <li>예약번호: <strong>{{ reservation.reservation_id }}</strong></li>
+    <li>{{ reservation.train_name }} · {{ reservation.dep_station }} → {{ reservation.arr_station }}</li>
+    <li>{{ reservation.dep_time|fmt_time }} 출발 / {{ reservation.arr_time|fmt_time }} 도착</li>
+    <li>좌석: {{ "특실" if reservation.seat_class.value == "special" else "일반실" }} {{ reservation.seat_no }}</li>
+    <li>운임: {{ reservation.fare|fmt_won }} ({{ reservation.passengers.total }}명)</li>
+    {% if reservation.deadline %}<li class="warn">구입기한: {{ reservation.deadline|fmt_time }} 까지 결제 필요</li>{% endif %}
+  </ul>
+  <p class="muted">좌석은 확보되었습니다. 실제 결제는 공식 KTX/SRT 화면에서 진행하세요.</p>
+</div>

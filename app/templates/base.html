@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ settings.app_name if settings else "Train Manager" }}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">🚄 Train Manager</a>
+    <nav>
+      <a href="/">조회·예약</a>
+      <a href="/watch">자동 예약대기</a>
+      <a href="/reservations">예약 내역</a>
+    </nav>
+    {% if settings %}
+    <span class="mode mode-{{ settings.data_source }}">
+      데이터 소스: {{ settings.data_source }}{% if settings.data_source == "mock" %} (가짜 데이터){% endif %}
+    </span>
+    {% endif %}
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <small>KTX/SRT 좌석 조회·예약 데모 · 실연동은 개인 학습/개인 용도 전제 · 결제는 공식 화면에서 진행</small>
+  </footer>
+</body>
+</html>
