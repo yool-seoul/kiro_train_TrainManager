@@ -110,7 +110,9 @@ class GoogleSheetCredentialStore(CredentialStore):
         client = gspread.authorize(creds)
         sheet = client.open_by_key(self._s.google_spreadsheet_id)
         worksheet = sheet.worksheet(self._s.google_worksheet_name)
-        return worksheet.get_all_records()  # 첫 행을 헤더로 사용
+        # numericise_ignore=['all']: 모든 셀을 문자열로 유지.
+        # (숫자로 변환되면 "0860..." 같은 아이디의 앞자리 0 이 사라진다)
+        return worksheet.get_all_records(numericise_ignore=["all"])  # 첫 행을 헤더로 사용
 
     def _read_via_csv(self) -> list[dict[str, str]]:
         if not self._s.google_csv_url:
