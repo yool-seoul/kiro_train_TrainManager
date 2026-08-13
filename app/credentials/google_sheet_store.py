@@ -33,7 +33,13 @@ _SCOPES = [
 
 def _row_to_credential(row: dict[str, str]) -> Credential | None:
     """시트 한 행 → Credential. 필수값 없으면 None (빈 행 스킵)."""
-    norm = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+    def _s(x: object) -> str:
+        # gspread 는 숫자 셀을 int/float 로 반환하므로 문자열로 정규화한다.
+        if x is None:
+            return ""
+        return str(x).strip()
+
+    norm = {_s(k).lower(): _s(v) for k, v in row.items()}
     if not all(norm.get(k) for k in _REQUIRED):
         return None
     try:

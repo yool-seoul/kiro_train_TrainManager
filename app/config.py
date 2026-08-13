@@ -35,11 +35,11 @@ class Settings(BaseSettings):
     # 데이터 소스: mock | live
     data_source: Literal["mock", "live"] = "mock"
 
-    # --- 자동 예약대기(watch) 기본값 (D8, 미확정 시 추천값) ---
-    watch_poll_interval_sec: int = 30          # 폴링 주기(초), 최소 15초 권장
-    watch_min_interval_sec: int = 15           # 하한
-    watch_max_duration_sec: int = 30 * 60      # 최대 감시 시간(초)
-    watch_max_jobs: int = 5                    # 동시 watch 개수 제한
+    # --- 자동 예약대기(watch) 기본값 (D8 답변 반영) ---
+    watch_poll_interval_sec: int = 10          # 폴링 주기(초) — D8-2: 10초
+    watch_min_interval_sec: int = 10           # 하한(anti-bot 보호)
+    watch_max_duration_sec: int = 30 * 60      # 최대 감시 시간(초) — D8-4: 30분
+    watch_max_jobs: int = 5                    # 동시 watch 개수 제한 — D8-4: 5개
 
     # --- Google Sheets 자격증명 (D7, 미확정 시 추천값) ---
     # 접근 방식: service_account | csv_url | disabled

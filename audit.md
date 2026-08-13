@@ -89,3 +89,36 @@
 **사용자**: `audit.md`(및 감사 로깅 steering)를 main 브랜치로 바로 커밋하고 푸시.
 
 **AI**: `audit.md`, `.kiro/steering/audit-logging.md`를 `main` 으로 전환 후 커밋(작성자 Luke Skywalker)하고 origin/main 에 push.
+
+## Turn 13 — 실제 KTX/SRT 계정 연동 구현
+**사용자**: 실제 ktx, srt 계정을 연동하는 작업 시작.
+
+**AI**:
+- 결정 문서 D7/D8 답변 확인: 서비스계정+gspread, 폴링 10초, 자동선점, 30분/5개, 알림=메신저(D8-1=c).
+- 라이브러리 실제 API 조사(korail2 문서/소스, SRTrain README/소스)로 객체 속성·메서드 확정.
+- `requirements.txt`: korail2-ncard/SRTrain/pycryptodome 활성화(실제버전 맞춰 pin: korail2-ncard>=0.1, SRTrain>=2.0).
+- `app/config.py`: 폴링 기본 10초, 하한 10초, 최대 30분, 동시 5개.
+- `app/providers/_live.py` 신규: ClientCache(계정별 로그인 client 캐시+Lock 직렬화), RawTrainCache(train_id→원본 열차객체), parse_dt.
+- `app/providers/ktx.py`(korail2), `app/providers/srt.py`(SRTrain) 실연동 구현: search/reserve/list/cancel 매핑. 상세 좌석맵은 라이브러리 미제공이라 live 에서 안내 메시지 반환(후속 과제).
+- `tests/test_live_providers.py`: 가짜 korail2/SRT 모듈 주입 + 가짜 client 로 매핑 검증(실제 예약/네트워크 없음). 전체 pytest 11건 통과.
+- 실제 패키지 import 스모크 확인(korail2-ncard 0.1.0, SRTrain 2.6.7).
+- `README.md`: live 전환 가이드/제약/주의 업데이트.
+- **후속(미구현)**: D8-1=c 메신저(카카오/텔레그램) 알림 — 현재 watch 알림은 웹 UI 내 표시만. 별도 작업 필요.
+
+## Turn 14 — Google Sheet 자격증명 읽기 확인(진단 페이지)
+**사용자**: Google Sheet 를 제대로 읽는지 확인하기 위해 시트 내용을 화면에 출력. (스프레드시트 ID `1neyA_...nS2w`, 시트명 `train_credentials`, 서비스계정 JSON 은 ~/Downloads 아래)
+
+**AI**:
+- 진단 페이지 추가: `GET /credentials` 라우트 + `templates/credentials.html`, base.html 네비 링크. credential_source/spreadsheet_id(마스킹)/worksheet/서비스계정 email 표시 + 읽어온 행(비밀번호·N카드 마스킹).
+- `.env` 생성(로컬, git 미추적): credential_source=service_account, 서비스계정 JSON 경로(~/Downloads), spreadsheet_id, worksheet=train_credentials.
+- 버그 수정: `google_sheet_store._row_to_credential` 이 gspread 의 숫자 셀(int)에서 `.strip()` 실패 → 값을 문자열로 정규화(`_s`)하도록 수정.
+- 결과: 시트 2행(ktx/srt, label=sangyool) 정상 읽힘, 오류 없음. http://127.0.0.1:8000/credentials 에서 확인.
+
+## Turn 15 — 진단 페이지 가드 + live 조회 시험 + 커밋
+**사용자**: 진행 승인 (① 진단 페이지 접근 가드, ② live 조회 시험, ③ 커밋).
+
+**AI**:
+- ① `/credentials` 진단 페이지를 debug 모드에서만 접근 가능하도록 가드(비-debug 시 404), 네비 링크도 debug 조건부 노출.
+- ② 실계정 live 조회 시험(읽기 전용): **SRT 성공**(로그인→netfunnel 대기열→10건 조회, 매핑 정상). **KTX 로그인 실패**(코드 정상 동작, Korail이 자격증명 거부 — 시트의 KTX login_id/비밀번호 확인 필요, 코드 버그 아님).
+- 전체 pytest 11건 통과.
+- ③ 커밋/푸시 (아래 진행).

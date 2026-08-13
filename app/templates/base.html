@@ -14,6 +14,7 @@
       <a href="/">조회·예약</a>
       <a href="/watch">자동 예약대기</a>
       <a href="/reservations">예약 내역</a>
+      {% if not settings or settings.debug %}<a href="/credentials">자격증명 진단</a>{% endif %}
     </nav>
     {% if settings %}
     <span class="mode mode-{{ settings.data_source }}">
