@@ -168,7 +168,7 @@ class KtxProvider(TrainProvider):
                 target = next((r for r in items if r.rsv_id == reservation_id), None)
                 if target is None:
                     raise ProviderError(f"예약을 찾을 수 없습니다: {reservation_id}", code="not_found")
-                client.cancel(target)
+                self._cancel_reservation(client, target)
             except ProviderError:
                 raise
             except Exception as exc:  # noqa: BLE001
@@ -177,7 +177,49 @@ class KtxProvider(TrainProvider):
         model.status = ReservationStatus.CANCELLED
         return model
 
+    @staticmethod
+    def _cancel_reservation(client, rsv) -> None:
+        """예약 취소 (korail2-ncard 버그 우회).
+
+        라이브러리의 `Korail.cancel()` 은 GET 요청 파라미터를 `data=`(본문)로 보내
+        서버가 400 을 반환한다. 정상 동작하는 `reservations()` 처럼 `params=`
+        (쿼리스트링)로 전송하면 취소가 성공한다.
+        """
+        import json
+
+        from korail2.korail2 import KORAIL_CANCEL
+
+        data = {
+            "Device": client._device,
+            "Version": client._version,
+            "Key": client._key,
+            "txtPnrNo": rsv.rsv_id,
+            "txtJrnySqno": rsv.journey_no,
+            "txtJrnyCnt": rsv.journey_cnt,
+            "hidRsvChgNo": rsv.rsv_chg_no,
+        }
+        r = client._session.get(KORAIL_CANCEL, params=data)
+        j = json.loads(r.text)
+        if j.get("strResult") != "SUCC":
+            msg = j.get("h_msg_txt") or j.get("h_msg_cd") or "알 수 없는 오류"
+            raise ProviderError(f"KTX 취소 실패: {msg}", code="cancel_failed")
+
     # ------------------------------------------------------------- mapping
+    @staticmethod
+    def _seat_no(r) -> str | None:
+        """korail2 Reservation 의 호차/좌석번호를 표시 문자열로 변환.
+
+        Reservation 은 car_no, seat_no, seat_no_end 를 제공한다.
+        복수 좌석이면 "3호차 5A~7A" 형태, 좌석 미배정이면 None.
+        """
+        car = getattr(r, "car_no", None)
+        start = getattr(r, "seat_no", None)
+        end = getattr(r, "seat_no_end", None)
+        if not start:
+            return None
+        rng = f"{start}~{end}" if end and end != start else f"{start}"
+        return f"{car}호차 {rng}".strip() if car else rng
+
     def _reservation_to_model(
         self, r, seat_class: SeatClass = SeatClass.GENERAL, passengers: Passengers | None = None
     ) -> Reservation:
@@ -196,7 +238,7 @@ class KtxProvider(TrainProvider):
             dep_time=parse_dt(r.dep_date, r.dep_time),
             arr_time=parse_dt(getattr(r, "arr_date", r.dep_date), r.arr_time),
             seat_class=seat_class,
-            seat_no=None,  # korail2 예약객체는 좌석번호 미제공
+            seat_no=self._seat_no(r),
             passengers=passengers or Passengers(adults=count),
             fare=int(getattr(r, "price", 0) or 0),
             status=ReservationStatus.RESERVED,

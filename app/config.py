@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     watch_max_duration_sec: int = 30 * 60      # 최대 감시 시간(초) — D8-4: 30분
     watch_max_jobs: int = 5                    # 동시 watch 개수 제한 — D8-4: 5개
 
+    # --- 알림(D8-1=c: 메신저) ---
+    # 채널: none(비활성) | telegram | console(디버그용 stdout)
+    notify_channel: Literal["none", "telegram", "console"] = "none"
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+
     # --- Google Sheets 자격증명 (D7, 미확정 시 추천값) ---
     # 접근 방식: service_account | csv_url | disabled
     credential_source: Literal["service_account", "csv_url", "disabled"] = "disabled"

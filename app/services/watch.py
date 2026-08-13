@@ -158,6 +158,7 @@ class WatchService:
                         f"좌석 선점 완료: {reservation.train_name} "
                         f"{reservation.seat_no or ''}. 구입기한 전에 결제하세요."
                     )
+                    self._notify_reserved(job)
                     return
             except ProviderError as exc:
                 # 매진(sold_out) 등 일시적 사유면 계속 감시, 그 외는 메시지만 갱신
@@ -166,6 +167,16 @@ class WatchService:
             # 다음 폴링까지 대기 (중단 시 즉시 빠져나옴)
             if stop_event.wait(interval):
                 return
+
+    @staticmethod
+    def _notify_reserved(job: WatchJob) -> None:
+        """선점 성공 시 메신저 알림. 알림 실패가 감시 흐름을 깨지 않도록 예외를 삼킨다."""
+        try:
+            from app.notify import get_notifier
+
+            get_notifier().notify_reserved(job)
+        except Exception as exc:  # noqa: BLE001
+            job.message = (job.message or "") + f" (알림 전송 실패: {exc})"
 
     @staticmethod
     def _pick(

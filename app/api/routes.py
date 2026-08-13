@@ -44,6 +44,26 @@ def _render_error(request: Request, message: str, status_code: int = 400) -> HTM
     )
 
 
+def _notify_reservation_async(reservation) -> None:
+    """예약(선점) 성공 알림을 백그라운드로 전송한다.
+
+    - HTTP 응답을 메신저 지연(최대 10초)으로 막지 않도록 daemon 스레드에서 보낸다.
+    - 알림 실패가 예약 결과 표시를 깨지 않도록 예외를 삼킨다.
+    - notify_channel 이 none 이면 NullNotifier 라 아무 것도 하지 않는다.
+    """
+    import threading
+
+    def _send() -> None:
+        try:
+            from app.notify import get_notifier
+
+            get_notifier().notify_reservation(reservation)
+        except Exception:  # noqa: BLE001, S110 - 알림 실패는 무시
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
+
+
 # ------------------------------------------------------------------- pages
 def _default_datetime():
     """현재 시각 기준 가장 가까운 미래(다음 30분 경계)의 날짜/시각 기본값."""
@@ -263,6 +283,7 @@ def reserve(
     except ProviderError as exc:
         return _render_error(request, exc.message)
 
+    _notify_reservation_async(reservation)
     return templates.TemplateResponse(
         request, "partials/reservation.html", {"reservation": reservation}
     )
