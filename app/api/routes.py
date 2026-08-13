@@ -35,7 +35,9 @@ def _passengers(adults: int, children: int, seniors: int) -> Passengers:
     return Passengers(adults=adults, children=children, seniors=seniors)
 
 
-def _render_error(request: Request, message: str, status_code: int = 400) -> HTMLResponse:
+def _render_error(request: Request, message: str, status_code: int = 200) -> HTMLResponse:
+    # 기본 200: HTMX 는 비-2xx 응답을 대상 영역에 스왑하지 않으므로,
+    # 조각(fragment) 요청의 도메인 오류는 200 으로 반환해 화면에 그대로 노출한다.
     return templates.TemplateResponse(
         request,
         "partials/error.html",
@@ -79,8 +81,11 @@ def _default_datetime():
 def index(request: Request) -> HTMLResponse:
     settings = get_settings()
     store = get_credential_store()
+    train_types = list(TrainType)
+    default_type = train_types[0] if train_types else None
     try:
-        creds = store.list_credentials()
+        # 초기 노출 계정은 기본 선택 열차(첫 번째 종류)의 계정만.
+        creds = store.list_credentials(default_type) if default_type else []
     except Exception:  # noqa: BLE001 - 자격증명 로드 실패 시에도 화면은 뜨게
         creds = []
     default_date, default_time = _default_datetime()
@@ -90,10 +95,23 @@ def index(request: Request) -> HTMLResponse:
         {
             "settings": settings,
             "credentials": creds,
-            "train_types": list(TrainType),
+            "train_types": train_types,
             "default_date": default_date,
             "default_time": default_time,
         },
+    )
+
+
+@router.get("/accounts", response_class=HTMLResponse)
+def accounts(request: Request, train_type: TrainType) -> HTMLResponse:
+    """선택한 열차 종류(provider)에 해당하는 계정 옵션만 반환 (계정 드롭다운 갱신용)."""
+    store = get_credential_store()
+    try:
+        creds = store.list_credentials(train_type)
+    except Exception:  # noqa: BLE001
+        creds = []
+    return templates.TemplateResponse(
+        request, "partials/account_options.html", {"credentials": creds}
     )
 
 
@@ -187,7 +205,7 @@ def search(
     arr: str = Form(...),
     date: str = Form(...),
     time: str = Form(...),
-    seat_class: SeatClass = Form(SeatClass.GENERAL),
+    seat_class: str = Form("all"),
     adults: int = Form(1),
     children: int = Form(0),
     seniors: int = Form(0),
@@ -195,6 +213,12 @@ def search(
 ) -> HTMLResponse:
     booking = get_booking_service()
     passengers = _passengers(adults, children, seniors)
+
+    # 좌석 등급 필터: all(모두) | general(일반실) | special(특실)
+    seat_filter = seat_class if seat_class in ("all", "general", "special") else "all"
+    # 예약/자동대기 기본 좌석 등급(구체값). '모두'면 일반실을 기본으로.
+    default_class = SeatClass.SPECIAL if seat_filter == "special" else SeatClass.GENERAL
+
     try:
         trains = booking.search(
             train_type,
@@ -207,14 +231,16 @@ def search(
             include_no_seats=True,
         )
     except ProviderError as exc:
-        return _render_error(request, exc.message)
+        # HTMX 가 #results 에 그대로 렌더할 수 있도록 200 으로 반환한다.
+        return _render_error(request, exc.message, status_code=200)
 
     return templates.TemplateResponse(
         request,
         "partials/results.html",
         {
             "trains": trains,
-            "seat_class": seat_class,
+            "seat_class": default_class,
+            "seat_filter": seat_filter,
             "passengers": passengers,
             "credential_label": credential_label or "",
             # 자동 예약대기 등록에 필요한 원본 검색 조건 (input 값 그대로)
@@ -227,7 +253,7 @@ def search(
                 "adults": adults,
                 "children": children,
                 "seniors": seniors,
-                "seat_class": seat_class.value,
+                "seat_class": default_class.value,
             },
         },
     )

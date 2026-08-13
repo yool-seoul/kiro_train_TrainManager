@@ -28,5 +28,42 @@
   <footer class="footer">
     <small>KTX/SRT 좌석 조회·예약 데모 · 실연동은 개인 학습/개인 용도 전제 · 결제는 공식 화면에서 진행</small>
   </footer>
+
+  <script>
+    // 공용 요청 상태 표시 패턴.
+    // 요청을 보내는 요소(또는 그 조상)에 data-status="#상태요소" 를 선언하면,
+    // 미클릭/전송중/성공/서버오류/네트워크오류를 해당 요소에 자동 표시한다.
+    // 주의: 자동 폴링 요소(예: watch 목록 5초 갱신)에는 data-status 를 붙이지 않아
+    //       주기적 요청이 상태 배너를 깜빡이게 하지 않는다.
+    (function () {
+      function statusElFor(elt) {
+        if (!elt || !elt.closest) return null;
+        var host = elt.closest('[data-status]');
+        if (!host) return null;
+        return document.querySelector(host.getAttribute('data-status'));
+      }
+      function setState(el, kind, xhr) {
+        if (!el) return;
+        el.className = 'req-state state-' + kind;
+        var code = xhr ? xhr.status : '?';
+        var messages = {
+          sending: '📡 요청을 전송했습니다. 서버 응답을 기다리는 중…',
+          done: '✅ 응답을 받았습니다.',
+          httperror: '⚠️ 요청은 전송됐지만 서버가 오류로 응답했습니다 (HTTP ' + code + ').',
+          neterror: '🔌 요청을 보내지 못했습니다. 네트워크 또는 서버 상태를 확인하세요.'
+        };
+        if (messages[kind]) el.innerHTML = messages[kind];
+      }
+      document.body.addEventListener('htmx:beforeRequest', function (e) {
+        setState(statusElFor(e.detail.elt), 'sending');
+      });
+      document.body.addEventListener('htmx:afterRequest', function (e) {
+        setState(statusElFor(e.detail.elt), e.detail.successful ? 'done' : 'httperror', e.detail.xhr);
+      });
+      document.body.addEventListener('htmx:sendError', function (e) {
+        setState(statusElFor(e.detail.elt), 'neterror');
+      });
+    })();
+  </script>
 </body>
 </html>

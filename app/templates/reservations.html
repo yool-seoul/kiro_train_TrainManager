@@ -2,7 +2,12 @@
 {% block content %}
 <section class="card">
   <h1>예약 내역</h1>
-  <div id="reservation-list">
+  {# 취소 요청의 상태를 표시 (공용 패턴: base.html) #}
+  <div id="reservation-state" class="req-state state-idle" aria-live="polite">
+    취소하려면 각 예약의 <b>취소</b> 버튼을 누르세요.
+  </div>
+  {# data-status 를 목록 컨테이너에 두면, 내부 취소 폼들이 이 상태 배너를 공유한다 #}
+  <div id="reservation-list" data-status="#reservation-state">
     {% include "partials/reservation_list.html" %}
   </div>
 </section>

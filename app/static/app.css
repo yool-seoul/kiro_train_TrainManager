@@ -71,6 +71,16 @@ table.trains th, table.trains td { padding: 8px; border-bottom: 1px solid var(--
 .alert-error { background: #fef2f2; border: 1px solid #fecaca; color: var(--no); padding: 12px; border-radius: 10px; }
 .htmx-indicator { display: none; color: var(--muted); }
 .htmx-request .htmx-indicator { display: inline; }
+/* 공용 요청 상태 배너 */
+.req-state {
+  margin-top: 12px; padding: 8px 12px; border-radius: 8px;
+  font-size: 13px; border: 1px solid var(--line);
+}
+.req-state.state-idle { background: #f8fafc; color: var(--muted); }
+.req-state.state-sending { background: #eef4ff; color: #1f4fb0; border-color: #cfe0ff; }
+.req-state.state-done { background: #e7f6ec; color: var(--ok); border-color: #bbf7d0; }
+.req-state.state-httperror,
+.req-state.state-neterror { background: #fef2f2; color: var(--no); border-color: #fecaca; }
 .wbadge { padding: 2px 8px; border-radius: 999px; font-size: 12px; }
 .wbadge-watching { background: #fff4e5; color: #9a5b00; }
 .wbadge-reserved { background: #e7f6ec; color: var(--ok); }

@@ -5,10 +5,18 @@
   <form id="search-form"
         hx-post="/search"
         hx-target="#results"
-        hx-indicator="#loading">
+        hx-swap="innerHTML"
+        hx-indicator="#loading"
+        hx-disabled-elt="#search-btn"
+        data-status="#search-state">
     <div class="grid">
       <label>열차
-        <select name="train_type">
+        {# 열차 종류를 바꾸면 해당 provider 계정만 드롭다운에 다시 채운다 #}
+        <select name="train_type"
+                hx-get="/accounts"
+                hx-target="#cred-select"
+                hx-swap="innerHTML"
+                hx-trigger="change">
           {% for t in train_types %}
           <option value="{{ t.value }}">{{ t.value|upper }}</option>
           {% endfor %}
@@ -20,6 +28,7 @@
       <label>시각 <input type="time" name="time" value="{{ default_time }}" required></label>
       <label>좌석
         <select name="seat_class">
+          <option value="all" selected>모두</option>
           <option value="general">일반실</option>
           <option value="special">특실</option>
         </select>
@@ -28,17 +37,18 @@
       <label>어린이 <input type="number" name="children" value="0" min="0" max="9"></label>
       <label>경로 <input type="number" name="seniors" value="0" min="0" max="9"></label>
       <label>계정
-        <select name="credential_label">
-          <option value="">(provider 기본 계정)</option>
-          {% for c in credentials %}
-          <option value="{{ c.label }}">{{ c.label }} · {{ c.provider.value|upper }} · {{ c.login_id }}</option>
-          {% endfor %}
+        <select name="credential_label" id="cred-select">
+          {% include "partials/account_options.html" %}
         </select>
       </label>
     </div>
     <div class="actions">
-      <button type="submit">조회</button>
-      <span id="loading" class="htmx-indicator">조회 중…</span>
+      <button id="search-btn" type="submit">조회</button>
+      <span id="loading" class="htmx-indicator">⏳ 응답 대기 중…</span>
+    </div>
+    {# 조회 요청의 상태를 명시적으로 구분해서 보여준다 (공용 패턴: base.html) #}
+    <div id="search-state" class="req-state state-idle" aria-live="polite">
+      아직 조회하지 않았습니다. 조건을 입력하고 <b>조회</b>를 누르세요.
     </div>
   </form>
 </section>
