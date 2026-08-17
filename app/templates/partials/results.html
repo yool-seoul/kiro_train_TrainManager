@@ -9,7 +9,7 @@
     <h2>조회 결과 ({{ trains|length }}건) · 좌석: {{ filter_label }}</h2>
     {# 조건 단위 자동 예약대기: 조건에 맞는 가장 이른 열차를 자동 선점 #}
     <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.successful) this.querySelector('button').disabled=true">
+          hx-disabled-elt="find button">
       <input type="hidden" name="train_type" value="{{ search.train_type }}">
       <input type="hidden" name="dep" value="{{ search.dep }}">
       <input type="hidden" name="arr" value="{{ search.arr }}">
@@ -44,7 +44,7 @@
       {% set reservable = row_general_ok or row_special_ok %}
       {% set fare = train.general_fare if show_general else train.special_fare %}
       <tr>
-        <td>{{ train.train_name }}</td>
+        <td>{{ train.train_name }}{% if train.is_transfer %}<br><span class="muted" style="font-size:11px">↔ {{ train.transfer_station }} 환승 · {{ train.transfer_train_name }}</span>{% endif %}</td>
         <td>{{ train.dep_station }} {{ train.dep_time|fmt_time }}</td>
         <td>{{ train.arr_station }} {{ train.arr_time|fmt_time }}</td>
         {% if show_general %}
@@ -67,7 +67,7 @@
           {# 선택 등급이 매진: 예약 불가 → 이 열차만 대기 #}
           <button type="button" class="btn-sm" disabled title="선택하신 좌석 등급 매진">예약</button>
           <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML"
-                hx-on::after-request="if(event.detail.successful) this.querySelector('button').disabled=true">
+                hx-on::after-request="if(event.detail.successful){var b=this.querySelector('button');b.disabled=true;b.textContent='대기중'}">
             <input type="hidden" name="train_type" value="{{ search.train_type }}">
             <input type="hidden" name="dep" value="{{ search.dep }}">
             <input type="hidden" name="arr" value="{{ search.arr }}">
@@ -80,7 +80,7 @@
             <input type="hidden" name="credential_label" value="{{ credential_label }}">
             <input type="hidden" name="target_train_id" value="{{ train.train_id }}">
             <input type="hidden" name="target_train_name" value="{{ train.train_name }}">
-            <button type="submit" class="btn-sm btn-watch">대기</button>
+            <button type="submit" class="btn-sm btn-watch" data-train-id="{{ train.train_id }}">대기</button>
           </form>
           {% else %}
           {# 예약 가능: 선택 등급만 예약 대상으로 노출 #}

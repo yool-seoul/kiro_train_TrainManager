@@ -65,6 +65,17 @@ class WatchService:
                     f"동시 감시 개수 제한({settings.watch_max_jobs})을 초과했습니다.",
                     code="too_many_watches",
                 )
+            # 동일 열차에 대한 활성 대기가 이미 있으면 중복 등록 방지
+            if target_train_id:
+                for j in self._jobs.values():
+                    if (
+                        j.status is WatchStatus.WATCHING
+                        and j.target_train_id == target_train_id
+                    ):
+                        raise ProviderError(
+                            "해당 열차는 이미 대기 중입니다.",
+                            code="duplicate_watch",
+                        )
 
         now = datetime.now()
         job = WatchJob(

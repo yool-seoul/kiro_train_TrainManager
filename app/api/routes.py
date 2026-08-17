@@ -15,6 +15,7 @@ from app.credentials import get_credential_store
 from app.providers.base import ProviderError
 from app.schemas import Passengers, SeatClass, TrainOption, TrainType
 from app.services import get_booking_service, get_watch_service
+from app.stations import get_default_stations, get_stations
 from app.web import templates
 
 router = APIRouter()
@@ -89,6 +90,7 @@ def index(request: Request) -> HTMLResponse:
     except Exception:  # noqa: BLE001 - 자격증명 로드 실패 시에도 화면은 뜨게
         creds = []
     default_date, default_time = _default_datetime()
+    default_dep, default_arr = get_default_stations(default_type) if default_type else ("서울", "부산")
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -98,6 +100,10 @@ def index(request: Request) -> HTMLResponse:
             "train_types": train_types,
             "default_date": default_date,
             "default_time": default_time,
+            "stations": get_stations(default_type) if default_type else [],
+            "default_dep": default_dep,
+            "default_arr": default_arr,
+            "nav_active": "search",
         },
     )
 
@@ -112,6 +118,17 @@ def accounts(request: Request, train_type: TrainType) -> HTMLResponse:
         creds = []
     return templates.TemplateResponse(
         request, "partials/account_options.html", {"credentials": creds}
+    )
+
+
+@router.get("/stations", response_class=HTMLResponse)
+def stations(request: Request, train_type: TrainType) -> HTMLResponse:
+    """선택한 열차 종류에 해당하는 역 옵션을 반환 (출발/도착역 드롭다운 갱신용)."""
+    station_list = get_stations(train_type)
+    default_dep, default_arr = get_default_stations(train_type)
+    return templates.TemplateResponse(
+        request, "partials/station_options.html",
+        {"stations": station_list, "default_dep": default_dep, "default_arr": default_arr},
     )
 
 
@@ -173,6 +190,7 @@ def credentials_page(request: Request) -> HTMLResponse:
             "error": error,
             "sa_email": sa_email,
             "spreadsheet_id_masked": _mask_id(settings.google_spreadsheet_id),
+            "nav_active": "credentials",
         },
     )
 
@@ -185,14 +203,14 @@ def reservations_page(request: Request) -> HTMLResponse:
     except ProviderError as exc:
         return _render_error(request, exc.message)
     return templates.TemplateResponse(
-        request, "reservations.html", {"reservations": items}
+        request, "reservations.html", {"reservations": items, "nav_active": "reservations"}
     )
 
 
 @router.get("/watch", response_class=HTMLResponse)
 def watch_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
-        request, "watch.html", {"jobs": get_watch_service().list_jobs()}
+        request, "watch.html", {"jobs": get_watch_service().list_jobs(), "nav_active": "watch"}
     )
 
 
@@ -383,7 +401,13 @@ def watch_list(request: Request) -> HTMLResponse:
 @router.post("/watch/stop", response_class=HTMLResponse)
 def stop_watch(request: Request, job_id: str = Form(...)) -> HTMLResponse:
     watch = get_watch_service()
-    watch.stop(job_id)
-    return templates.TemplateResponse(
+    job = watch.stop(job_id)
+    response = templates.TemplateResponse(
         request, "partials/watch_list.html", {"jobs": watch.list_jobs()}
     )
+    # 중단된 job의 target_train_id를 헤더로 전달 → 프론트에서 대기 버튼 re-enable
+    if job and job.target_train_id:
+        response.headers["HX-Trigger-After-Swap"] = (
+            '{"watchStopped":{"trainId":"' + job.target_train_id + '"}}'
+        )
+    return response

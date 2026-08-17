@@ -72,14 +72,35 @@ class _FakeResp:
 
 
 class _FakeSession:
-    """cancel 우회 경로 검증용: params= 요청에 성공 JSON 반환."""
+    """cancel/reservations/search 우회 경로 검증용."""
 
     def __init__(self):
         self.last_params = None
 
-    def get(self, url, params=None, data=None):
+    def get(self, url, params=None, data=None, headers=None):
         self.last_params = params
-        return _FakeResp('{"strResult":"SUCC","h_msg_cd":"IRG000000","h_msg_txt":"정상"}')
+        if "cancel" in url.lower():
+            return _FakeResp('{"strResult":"SUCC","h_msg_cd":"IRG000000","h_msg_txt":"정상"}')
+        # reservations 목록 요청
+        return _FakeResp(
+            '{"strResult":"SUCC","jrny_infos":{"jrny_info":[{"train_infos":{"train_info":[{'
+            '"h_pnr_no":"KTX20260901001","h_trn_clsf_cd":"00","h_trn_clsf_nm":"KTX",'
+            '"h_trn_no":"101","h_trn_gp_cd":"100",'
+            '"h_dpt_rs_stn_nm":"서울","h_dpt_rs_stn_cd":"0001",'
+            '"h_arv_rs_stn_nm":"부산","h_arv_rs_stn_cd":"0020",'
+            '"h_dpt_dt":"20260901","h_dpt_tm":"090000",'
+            '"h_arv_dt":"20260901","h_arv_tm":"114300",'
+            '"h_run_dt":"20260901",'
+            '"h_rsv_amt":"59800","h_tot_seat_cnt":"1",'
+            '"h_srcar_no":"3","h_seat_no":"5A","h_seat_no_end":"6A",'
+            '"h_ntisu_lmt_dt":"20260901","h_ntisu_lmt_tm":"093000",'
+            '"txtJrnySqno":"001","txtJrnyCnt":"01","hidRsvChgNo":"00"'
+            '}]}}]}}'
+        )
+
+    def post(self, url, params=None, data=None, headers=None):
+        # 환승 조회 — 빈 결과 반환 (테스트에서는 직통만 확인)
+        return _FakeResp('{"strResult":"FAIL","h_msg_txt":"no transfer"}')
 
 
 class FakeKorailClient:
@@ -91,6 +112,9 @@ class FakeKorailClient:
         self._version = "x"
         self._key = "k"
         self._session = _FakeSession()
+
+    def _get_auth_headers_and_sid(self, url):
+        return {}, "fake_sid"
 
     def search_train(self, *a, **k):
         return [FakeKorailTrain(general=True, special=True)]
@@ -135,6 +159,39 @@ def fake_korail(monkeypatch):
     # cancel 우회 경로가 참조하는 korail2.korail2.KORAIL_CANCEL 제공
     sub = types.ModuleType("korail2.korail2")
     sub.KORAIL_CANCEL = "http://fake/cancel"
+    sub.KORAIL_MYRESERVATIONLIST = "http://fake/reservations"
+    sub.KORAIL_SEARCH_SCHEDULE = "http://fake/search"
+    sub.Train = type("Train", (), {
+        "__init__": lambda self, data: None,
+    })
+    sub.Reservation = type("Reservation", (), {
+        "__init__": lambda self, data: [
+            setattr(self, k, v) for k, v in {
+                "dep_date": data.get("h_run_dt"),
+                "arr_date": data.get("h_run_dt"),
+                "rsv_id": data.get("h_pnr_no"),
+                "seat_no_count": int(data.get("h_tot_seat_cnt", "1")),
+                "buy_limit_date": data.get("h_ntisu_lmt_dt"),
+                "buy_limit_time": data.get("h_ntisu_lmt_tm"),
+                "price": int(data.get("h_rsv_amt", "0")),
+                "journey_no": data.get("txtJrnySqno", "001"),
+                "journey_cnt": data.get("txtJrnyCnt", "01"),
+                "rsv_chg_no": data.get("hidRsvChgNo", "00000"),
+                "train_type": data.get("h_trn_clsf_cd"),
+                "train_type_name": data.get("h_trn_clsf_nm"),
+                "train_group": data.get("h_trn_gp_cd"),
+                "train_no": data.get("h_trn_no"),
+                "delay_time": data.get("h_expct_dlay_hr"),
+                "dep_name": data.get("h_dpt_rs_stn_nm"),
+                "dep_code": data.get("h_dpt_rs_stn_cd"),
+                "dep_time": data.get("h_dpt_tm"),
+                "arr_name": data.get("h_arv_rs_stn_nm"),
+                "arr_code": data.get("h_arv_rs_stn_cd"),
+                "arr_time": data.get("h_arv_tm"),
+                "run_date": data.get("h_run_dt"),
+            }.items()
+        ] and None,
+    })
     mod.korail2 = sub
 
     monkeypatch.setitem(sys.modules, "korail2", mod)
