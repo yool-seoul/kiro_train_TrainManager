@@ -8,7 +8,8 @@
   <div class="results-head">
     <h2>조회 결과 ({{ trains|length }}건) · 좌석: {{ filter_label }}</h2>
     {# 조건 단위 자동 예약대기: 조건에 맞는 가장 이른 열차를 자동 선점 #}
-    <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
+    <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) this.querySelector('button').disabled=true">
       <input type="hidden" name="train_type" value="{{ search.train_type }}">
       <input type="hidden" name="dep" value="{{ search.dep }}">
       <input type="hidden" name="arr" value="{{ search.arr }}">
@@ -65,7 +66,8 @@
           {% if not reservable %}
           {# 선택 등급이 매진: 예약 불가 → 이 열차만 대기 #}
           <button type="button" class="btn-sm" disabled title="선택하신 좌석 등급 매진">예약</button>
-          <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML">
+          <form hx-post="/watch" hx-target="#watch-panel" hx-swap="innerHTML"
+                hx-on::after-request="if(event.detail.successful) this.querySelector('button').disabled=true">
             <input type="hidden" name="train_type" value="{{ search.train_type }}">
             <input type="hidden" name="dep" value="{{ search.dep }}">
             <input type="hidden" name="arr" value="{{ search.arr }}">
