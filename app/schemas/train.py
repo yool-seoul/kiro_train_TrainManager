@@ -116,6 +116,10 @@ class TrainOption(BaseModel):
     waiting_available: bool = False            # 예약대기 가능 여부
     general_fare: int | None = None
     special_fare: int | None = None
+    # 환승 정보 (None이면 직통)
+    is_transfer: bool = False
+    transfer_station: str | None = None        # 환승역 (예: "동대구")
+    transfer_train_name: str | None = None     # 환승 열차명 (예: "KTX 121")
 
     @property
     def any_available(self) -> bool:

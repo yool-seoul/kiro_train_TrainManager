@@ -11,8 +11,8 @@
         data-status="#search-state">
     <div class="grid">
       <label>열차
-        {# 열차 종류를 바꾸면 해당 provider 계정만 드롭다운에 다시 채운다 #}
-        <select name="train_type"
+        {# 열차 종류를 바꾸면 계정 + 역 드롭다운을 갱신한다 #}
+        <select name="train_type" id="train-type-select"
                 hx-get="/accounts"
                 hx-target="#cred-select"
                 hx-swap="innerHTML"
@@ -22,8 +22,20 @@
           {% endfor %}
         </select>
       </label>
-      <label>출발역 <input name="dep" value="서울" required></label>
-      <label>도착역 <input name="arr" value="부산" required></label>
+      <label>출발역
+        <select name="dep" id="dep-select">
+          {% for s in stations %}
+          <option value="{{ s }}" {{ "selected" if s == default_dep else "" }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>도착역
+        <select name="arr" id="arr-select">
+          {% for s in stations %}
+          <option value="{{ s }}" {{ "selected" if s == default_arr else "" }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <label>날짜 <input type="date" name="date" value="{{ default_date }}" required></label>
       <label>시각 <input type="time" name="time" value="{{ default_time }}" required></label>
       <label>좌석
@@ -54,4 +66,26 @@
 </section>
 
 <section id="results"></section>
+
+<script>
+// 열차 종류별 기본 출발역/도착역
+var defaultStations = {ktx: {dep: '서울', arr: '울산(통도사)'}, srt: {dep: '수서', arr: '울산(통도사)'}};
+
+// 열차 종류 변경 시 출발역/도착역 드롭다운을 해당 열차 역 목록으로 갱신
+document.getElementById('train-type-select').addEventListener('change', function() {
+  const trainType = this.value;
+  fetch('/stations?train_type=' + encodeURIComponent(trainType))
+    .then(r => r.text())
+    .then(html => {
+      const depSel = document.getElementById('dep-select');
+      const arrSel = document.getElementById('arr-select');
+      depSel.innerHTML = html;
+      arrSel.innerHTML = html;
+      // 기본역 설정
+      var defs = defaultStations[trainType] || {};
+      if (defs.dep && [...depSel.options].some(o => o.value === defs.dep)) depSel.value = defs.dep;
+      if (defs.arr && [...arrSel.options].some(o => o.value === defs.arr)) arrSel.value = defs.arr;
+    });
+});
+</script>
 {% endblock %}

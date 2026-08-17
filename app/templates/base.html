@@ -11,10 +11,10 @@
   <header class="topbar">
     <a class="brand" href="/">🚄 Train Manager</a>
     <nav>
-      <a href="/">조회·예약</a>
-      <a href="/watch">자동 예약대기</a>
-      <a href="/reservations">예약 내역</a>
-      {% if not settings or settings.debug %}<a href="/credentials">자격증명 진단</a>{% endif %}
+      <a href="/" {% if nav_active == 'search' %}class="active"{% endif %}>조회·예약</a>
+      <a href="/watch" {% if nav_active == 'watch' %}class="active"{% endif %}>자동 예약대기</a>
+      <a href="/reservations" {% if nav_active == 'reservations' %}class="active"{% endif %}>예약 내역</a>
+      {% if not settings or settings.debug %}<a href="/credentials" {% if nav_active == 'credentials' %}class="active"{% endif %}>자격증명 진단</a>{% endif %}
     </nav>
     {% if settings %}
     <span class="mode mode-{{ settings.data_source }}">
@@ -64,6 +64,13 @@
         setState(statusElFor(e.detail.elt), 'neterror');
       });
     })();
+    // 대기 중단(watchStopped) 시 해당 열차의 대기 버튼을 re-enable
+    document.body.addEventListener('watchStopped', function (e) {
+      var trainId = e.detail && e.detail.trainId;
+      if (!trainId) return;
+      var btn = document.querySelector('button[data-train-id="' + trainId + '"]');
+      if (btn) { btn.disabled = false; btn.textContent = '대기'; }
+    });
   </script>
 </body>
 </html>

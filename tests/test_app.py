@@ -29,7 +29,6 @@ def _force_mock(monkeypatch):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "data_source", "mock")
-    monkeypatch.setattr(settings, "notify_channel", "none")
     reset_providers()
     yield
     reset_providers()

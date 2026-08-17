@@ -269,3 +269,111 @@
 - 4) 머지된 브랜치 3개 원격 삭제(HTTP 204): feature/search-ui-improvements, feature/real-reservation-notify, feature/live-integration.
 - 로컬 정리: 커밋 안 된 audit.md(이전 턴 기록)는 stash로 보존 후 `main` 을 origin/main(75d9bce)으로 fast-forward, 로컬 병합 브랜치 삭제, stash 복원. (레포 자격증명 토큰 사용, 값 미노출)
 - 남은 정리 후보: origin/feature/watch-soldout-ux(PR #1 잔재). audit.md 변경은 직접 main push 지양 위해 미커밋 상태로 보존.
+
+## Turn 31 — 프로젝트 현황 파악 + 환경 재구성
+**사용자**: audit.md와 commit 로그 확인, 개발 작업 이어서 진행할 수 있도록 내용 파악.
+
+**AI**:
+- audit.md(Turn 1~30) 및 git log(14 commits) 확인. 프로젝트 현황 요약: KTX/SRT 조회·예약·취소 전체 기능 완성, live/mock 모드, 텔레그램 알림, Google Sheet 자격증명, 자동 예약대기.
+- `.env` 파일 미존재 확인 → 필요 설정값 목록 안내.
+- Python 3.13 venv 구성(uv 설치 → .venv 생성 → requirements.txt 설치), 설정 검증(data_source=live, SA 파일 존재, 텔레그램 설정됨), Google Sheet 읽기(KTX+SRT 2계정 정상), pytest 16건 통과.
+
+## Turn 32 — .env 및 서비스계정 파일 설정 완료 확인
+**사용자**: .env 파일과 google service account 파일 정보 설정 완료.
+
+**AI**: `.env` 확인(data_source=live, credential_source=service_account, notify_channel=telegram). 서비스계정 JSON 존재 확인. Google Sheet에서 KTX(이상율)+SRT(이상율) 2계정 정상 읽힘. pytest 16건 통과.
+
+## Turn 33 — mock 알림 텔레그램 오발송 원인 파악
+**사용자**: 예약 요청하지 않은 9월 1일 08:03 열차에 대해 예약 문자가 텔레그램으로 전송됨. 예약번호 SRT2608170001은 실제 SRT 규칙 아님.
+
+**AI**:
+- 원인 규명: 예약번호 `SRT2608170001`은 mock provider의 생성 패턴(`TYPE+yymmdd+counter`). mock 모드 watch가 5~30초 후 좌석 풀림 시뮬레이션 → 가짜 예약 성공 → 텔레그램(notify_channel=telegram)으로 실제 전송.
+- 근본 원인 = mock 모드에서도 텔레그램 알림이 진짜로 발송되는 설계 결함.
+- 수정 방안 제시: (1) mock이면 알림 안 보내기, (2) mock 알림에 [테스트] 태그 추가.
+
+## Turn 34 — mock 알림에 [테스트] 태그 추가
+**사용자**: 2번(태그 추가)으로 진행.
+
+**AI**: `app/notify/base.py`에 `_is_mock()` 추가, `build_reservation_message()`의 기본 헤더에 mock이면 `[테스트]` 접두어 추가. live 모드에서는 태그 없음. pytest 16건 통과.
+
+## Turn 35 — 서버 재기동 + SRT 계정 추가 반영
+**사용자**: 구글시트에 SRT 계정 추가. 서버 재기동.
+
+**AI**: 서버 재기동. Google Sheet에서 3계정 확인: ktx(이상율, 0860729075), srt(이상율, 2185850814), srt(김수현, 1595128775).
+
+## Turn 36 — 서버 재기동 시 mock 테스트 문자 전송 문제 수정
+**사용자**: 서버 재기동 시 여전히 mock 테스트 문자가 텔레그램으로 전달됨.
+
+**AI**:
+- 원인: pytest 실행 시 `test_app.py`의 watch 테스트가 mock 예약 성공 → notify_channel=telegram(`.env`에서 로드) → 실제 텔레그램 전송.
+- 수정: `tests/test_app.py`의 `_force_mock`에서 `notify_channel=none` 추가. `tests/conftest.py` 신규 — 전역 autouse fixture로 모든 테스트에서 `credential_source=disabled`, `notify_channel=none` 고정. Google Sheets rate limit 문제도 해결.
+- pytest 16건 통과.
+
+## Turn 37 — .DS_Store gitignore 조치
+**사용자**: .DS_Store 파일은 git commit 되지 않도록 조치.
+
+**AI**: `.gitignore`에 `.DS_Store` 추가. git에 추적 중인 .DS_Store 파일 없음 확인.
+
+## Turn 38 — 커밋/PR/머지/브랜치 정리
+**사용자**: 현재까지 수정사항을 github에 commit, push. 별도 브랜치로.
+
+**AI**:
+- 브랜치 `fix/mock-notify-and-watch-ux` 생성. 4파일 커밋(`886adf1`, 작성자 Luke Skywalker). PAT으로 push.
+- PR #6 생성(REST API) → 머지(`b6c129e`) → 원격 브랜치 삭제(fix/mock-notify-and-watch-ux, feature/watch-soldout-ux).
+- 로컬: main fast-forward, 로컬 브랜치 삭제, remote prune.
+- git credential store에 PAT 저장(향후 push용).
+
+## Turn 39 — UI 수정: 역 드롭다운 + 대기 버튼 재활성화
+**사용자**: (1) 출발역/도착역을 선택 가능한 역 dropbox 형태로, (2) 대기 → 중단 후 다시 대기 선택 가능하도록.
+
+**AI**:
+- (1) `app/stations.py` 신규: KTX 42개역, SRT 33개역 목록. `/stations?train_type=` 엔드포인트 + `partials/station_options.html` 추가. `index.html` 출발역/도착역을 `<select>` 드롭다운으로 변경. 열차 종류 변경 시 JS fetch로 역 목록 갱신.
+- (2) 대기 버튼: `hx-disabled-elt`(요청 중에만 disable, 응답 후 복원) + WatchService에 동일 열차 활성 watch 중복 등록 가드(`duplicate_watch` 에러). 중단 후 버튼 자동 활성.
+- `tests/conftest.py` 신규(전역 외부 서비스 비활성화). pytest 16건 통과. 서버 재시작 후 역 드롭다운/stations API 정상.
+
+## Turn 40 — 대기 버튼 disabled/enabled 수정
+**사용자**: 대기 클릭 시 버튼 disabled, 중단 시 enabled 되어야 함. 현재는 대기 후에도 버튼이 활성 상태.
+
+**AI**:
+- `results.html`: 대기 form에 `hx-on::after-request`로 성공 시 `btn.disabled=true; btn.textContent='대기중'`. 버튼에 `data-train-id="{{ train.train_id }}"` 속성 추가.
+- `routes.py`: `stop_watch`에서 중단된 job의 `target_train_id`를 `HX-Trigger-After-Swap: {"watchStopped":{"trainId":"..."}}` 헤더로 전달.
+- `base.html`: `watchStopped` 이벤트 리스너 추가 — 해당 train_id의 버튼을 `disabled=false; textContent='대기'`로 복원.
+- pytest 16건 통과. 서버 재시작 확인.
+
+
+## Turn 41 — KTX 예약 좌석번호 누락 수정
+**사용자**: KTX 예약 정보에서 일반석 표시만 되고 차량번호/좌석번호를 가져오지 못하는 문제 해결 요청.
+
+**AI**:
+- 원인: korail2-ncard `Reservation.__init__`이 `h_srcar_no`(호차), `h_seat_no`, `h_seat_no_end` 필드를 파싱하지 않음(주석 처리). `getattr(r, 'car_no')` 가 항상 None 반환.
+- 수정(`app/providers/ktx.py`):
+  - `_reservations_with_seats(client)` 정적 메서드 신규 — raw JSON에서 직접 `KORAIL_MYRESERVATIONLIST` 호출 → Reservation 객체 생성 후 `car_no`/`seat_no`/`seat_no_end` 수동 주입.
+  - `list_reservations`, `reserve`, `cancel` 모두 `client.reservations()` 대신 `_reservations_with_seats(client)` 사용으로 변경.
+- 테스트(`tests/test_live_providers.py`): `_FakeSession`이 reservations API JSON도 반환하도록 확장, fake `korail2.korail2` 모듈에 `KORAIL_MYRESERVATIONLIST`/`Reservation` 추가.
+- pytest 16건 통과.
+
+
+## Turn 42 — 상단 메뉴 활성 표시 + 출발/도착역 기본값 변경
+**사용자**: (1) 상단 메뉴에서 현재 화면이 어떤 메뉴인지 구분할 수 있어야 함, (2) 기본역을 KTX: 서울→울산(통도사), SRT: 수서→울산(통도사)로 변경.
+
+**AI**:
+- (1) `base.html`: nav 링크에 `{% if nav_active == 'xxx' %}class="active"{% endif %}` 조건부 클래스 추가. `app.css`: `.topbar nav a.active` 스타일(파란색, 굵게, 하단 보더). 각 페이지 라우트(index/watch/reservations/credentials)에서 `nav_active` 값 전달.
+- (2) `app/stations.py`: `get_default_stations(train_type)` 추가(KTX→서울/울산(통도사), SRT→수서/울산(통도사)). `routes.py`: index에 `default_dep`/`default_arr` 전달. `index.html`: select에 `{{ "selected" if s == default_dep }}` 조건 적용. JS: 열차 종류 변경 시 기본역을 자동 선택.
+- pytest 16건 통과. 서버 재시작 후 확인(active 클래스, 기본역 정상).
+
+
+## Turn 43 — KTX 환승 조회 지원
+**사용자**: 열차는 직통과 환승 둘 다 조회할 수 있어야 함. 현재 환승 조회가 안됨.
+
+**AI**:
+- 원인: korail2 `search_train`이 `radJobId='1'`(직통)으로 하드코딩. SRT도 `chtnDvCd='1'` 고정.
+- 코레일 API 직접 호출 테스트: `radJobId='2'`로 환승 조회 성공. 결과는 `h_chg_trn_seq=1`(첫 열차) + `h_chg_trn_seq=2`(환승 열차) 쌍으로 반환.
+- 구현(`app/providers/ktx.py`):
+  - `search()` 수정: 직통 조회 후 `_search_transfer()` 로 환승도 조회 → 합쳐서 출발시간순 정렬 반환.
+  - `_search_transfer()` 신규: `radJobId=2`로 API 직접 호출, seq=1+2 쌍을 `TrainOption` 1건으로 매핑. 환승역/환승열차명 표시.
+- 스키마(`app/schemas/train.py`): `TrainOption`에 `is_transfer`, `transfer_station`, `transfer_train_name` 필드 추가.
+- 템플릿(`results.html`): 환승 열차는 열차명 아래에 "↔ 동대구 환승 · KTX 121" 표시.
+- 테스트: fake 모듈에 `KORAIL_SEARCH_SCHEDULE`, `Train`, `post()`, `_get_auth_headers_and_sid` 추가. pytest 16건 통과.
+- 실서버 확인: KTX 서울→울산(통도사) 조회 시 직통+환승 합쳐 10건 반환, 환승 5건 표시됨.
+- 참고: SRT 환승은 미구현(라이브러리 내부 API 우회 필요, 후속 과제). KTX 환승 예약도 후속 과제(예약 데이터에 여정2 채워야 함).
+

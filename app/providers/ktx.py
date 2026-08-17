@@ -92,6 +92,9 @@ class KtxProvider(TrainProvider):
 
         client = self._client(credential)
         lock = self._clients.lock_for(credential.login_id)
+
+        # 직통 조회
+        direct_options = []
         with lock:
             try:
                 trains = client.search_train(
@@ -101,16 +104,130 @@ class KtxProvider(TrainProvider):
                     include_no_seats=include_no_seats,
                 )
             except NoResultsError:
-                return []
+                trains = []
             except ProviderError:
                 raise
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"KTX 조회 오류: {exc}", code="search_error") from exc
 
-        options = []
         for t in trains[: limit or len(trains)]:
             self._raw.put(self._train_id(t), t)
-            options.append(self._to_option(t))
+            direct_options.append(self._to_option(t))
+
+        # 환승 조회
+        transfer_options = self._search_transfer(
+            client, lock, credential, dep, arr, date, time,
+            passengers=passengers, limit=limit, include_no_seats=include_no_seats,
+        )
+
+        # 직통 + 환승 합쳐서 출발시간순 정렬
+        all_options = direct_options + transfer_options
+        all_options.sort(key=lambda o: o.dep_time)
+        return all_options[: limit or len(all_options)]
+
+    def _search_transfer(
+        self, client, lock, credential, dep, arr, date, time, *, passengers, limit=10, include_no_seats=True
+    ) -> list[TrainOption]:
+        """환승 열차 조회 (radJobId=2). 2개씩 쌍으로 묶어 TrainOption 1건으로 반환."""
+        import json
+
+        from korail2.korail2 import KORAIL_SEARCH_SCHEDULE
+
+        headers, sid = client._get_auth_headers_and_sid(KORAIL_SEARCH_SCHEDULE)
+        psg = self._passengers(passengers)
+        from functools import reduce
+        from korail2 import AdultPassenger, ChildPassenger, SeniorPassenger  # type: ignore
+
+        adult_count = reduce(lambda a, b: a + b.count, [p for p in psg if isinstance(p, AdultPassenger)], 0)
+        child_count = reduce(lambda a, b: a + b.count, [p for p in psg if isinstance(p, ChildPassenger)], 0)
+        senior_count = reduce(lambda a, b: a + b.count, [p for p in psg if isinstance(p, SeniorPassenger)], 0)
+
+        data = {
+            "Device": client._device,
+            "radJobId": "2",  # 환승
+            "selGoTrain": "100",  # KTX
+            "txtCardPsgCnt": "0",
+            "txtGdNo": "",
+            "txtGoAbrdDt": date,
+            "txtGoEnd": arr,
+            "txtGoHour": time,
+            "txtGoStart": dep,
+            "txtJobDv": "",
+            "txtMenuId": "11",
+            "txtPsgFlg_1": adult_count,
+            "txtPsgFlg_2": child_count,
+            "txtPsgFlg_8": 0,
+            "txtPsgFlg_3": senior_count,
+            "txtPsgFlg_4": "0",
+            "txtPsgFlg_5": "0",
+            "txtSeatAttCd_2": "000",
+            "txtSeatAttCd_3": "000",
+            "txtSeatAttCd_4": "015",
+            "txtTrnGpCd": "100",
+            "Version": client._version,
+        }
+
+        with lock:
+            try:
+                r = client._session.post(KORAIL_SEARCH_SCHEDULE, params=data, headers=headers)
+                j = json.loads(r.text)
+            except Exception as exc:  # noqa: BLE001
+                # 환승 조회 실패는 무시 (직통 결과만 반환)
+                return []
+
+        if j.get("strResult") != "SUCC":
+            return []
+
+        infos = j.get("trn_infos", {}).get("trn_info", [])
+        if not infos:
+            return []
+
+        # seq=1, seq=2 쌍으로 묶기
+        from korail2.korail2 import Train as KTrain
+
+        options: list[TrainOption] = []
+        i = 0
+        while i < len(infos) - 1:
+            t1 = infos[i]
+            t2 = infos[i + 1]
+            seq1 = t1.get("h_chg_trn_seq", "")
+            seq2 = t2.get("h_chg_trn_seq", "")
+            if seq1 == "1" and seq2 == "2":
+                # 환승 쌍
+                train1 = KTrain(t1)
+                train2 = KTrain(t2)
+                transfer_id = f"ktx-transfer-{date}-{train1.train_no}-{train2.train_no}-{train1.dep_time[:4]}"
+                # raw 캐시에 양쪽 열차 저장 (예약 시 사용)
+                self._raw.put(transfer_id, (train1, train2))
+                self._raw.put(self._train_id(train1), train1)
+                self._raw.put(self._train_id(train2), train2)
+
+                gen1 = train1.has_general_seat()
+                gen2 = train2.has_general_seat()
+                spe1 = train1.has_special_seat()
+                spe2 = train2.has_special_seat()
+
+                opt = TrainOption(
+                    train_id=transfer_id,
+                    train_type=TrainType.KTX,
+                    train_name=f"{train1.train_type_name} {train1.train_no}",
+                    dep_station=train1.dep_name,
+                    arr_station=train2.arr_name,
+                    dep_time=parse_dt(train1.dep_date, train1.dep_time),
+                    arr_time=parse_dt(getattr(train2, "arr_date", train2.dep_date), train2.arr_time),
+                    general_available=gen1 and gen2,
+                    special_available=spe1 and spe2,
+                    waiting_available=False,
+                    is_transfer=True,
+                    transfer_station=train1.arr_name,
+                    transfer_train_name=f"{train2.train_type_name} {train2.train_no}",
+                )
+                if include_no_seats or opt.any_available:
+                    options.append(opt)
+                i += 2
+            else:
+                i += 1
+
         return options
 
     # --------------------------------------------------------------- seats
@@ -145,7 +262,14 @@ class KtxProvider(TrainProvider):
                 raise ProviderError("매진되어 예약에 실패했습니다.", code="sold_out") from exc
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"KTX 예약 오류: {exc}", code="reserve_error") from exc
-        return self._reservation_to_model(rsv, seat_class, passengers)
+            # reserve() 반환값은 좌석 정보가 누락됨(라이브러리 버그).
+            # 좌석 정보가 포함된 예약 목록에서 해당 예약을 다시 조회한다.
+            try:
+                enriched = self._reservations_with_seats(client)
+                matched = next((r for r in enriched if r.rsv_id == rsv.rsv_id), rsv)
+            except Exception:  # noqa: BLE001
+                matched = rsv
+        return self._reservation_to_model(matched, seat_class, passengers)
 
     # -------------------------------------------------- list_reservations
     def list_reservations(self, credential) -> list[Reservation]:
@@ -153,10 +277,37 @@ class KtxProvider(TrainProvider):
         lock = self._clients.lock_for(credential.login_id)
         with lock:
             try:
-                items = client.reservations()
+                items = self._reservations_with_seats(client)
             except Exception as exc:  # noqa: BLE001
                 raise ProviderError(f"KTX 예약 목록 오류: {exc}", code="list_error") from exc
         return [self._reservation_to_model(r) for r in items]
+
+    @staticmethod
+    def _reservations_with_seats(client) -> list:
+        """예약 목록을 조회하되, 좌석번호(h_srcar_no, h_seat_no 등)를 Reservation 객체에 주입한다.
+
+        korail2-ncard 의 Reservation.__init__ 이 좌석 필드를 파싱하지 않아
+        getattr(r, 'car_no') 가 항상 None. 여기서 raw dict 를 보존하여 보완한다.
+        """
+        import json
+
+        from korail2.korail2 import KORAIL_MYRESERVATIONLIST, Reservation as KReservation
+
+        data = {"Device": client._device, "Version": client._version, "Key": client._key}
+        r = client._session.get(KORAIL_MYRESERVATIONLIST, params=data)
+        j = json.loads(r.text)
+        if j.get("strResult") != "SUCC":
+            return []
+        reserves = []
+        for info in j.get("jrny_infos", {}).get("jrny_info", []):
+            for tinfo in info.get("train_infos", {}).get("train_info", []):
+                rsv = KReservation(tinfo)
+                # 좌석 정보 보강 (라이브러리 미파싱 필드)
+                rsv.car_no = tinfo.get("h_srcar_no") or None
+                rsv.seat_no = tinfo.get("h_seat_no") or None
+                rsv.seat_no_end = tinfo.get("h_seat_no_end") or None
+                reserves.append(rsv)
+        return reserves
 
     # -------------------------------------------------------------- cancel
     def cancel(self, credential, reservation_id) -> Reservation:
@@ -164,7 +315,7 @@ class KtxProvider(TrainProvider):
         lock = self._clients.lock_for(credential.login_id)
         with lock:
             try:
-                items = client.reservations()
+                items = self._reservations_with_seats(client)
                 target = next((r for r in items if r.rsv_id == reservation_id), None)
                 if target is None:
                     raise ProviderError(f"예약을 찾을 수 없습니다: {reservation_id}", code="not_found")

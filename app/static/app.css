@@ -22,6 +22,7 @@ body {
 .topbar nav { display: flex; gap: 14px; }
 .topbar nav a { text-decoration: none; color: #374151; }
 .topbar nav a:hover { color: var(--primary); }
+.topbar nav a.active { color: var(--primary); font-weight: 600; border-bottom: 2px solid var(--primary); padding-bottom: 2px; }
 .mode { margin-left: auto; font-size: 13px; padding: 3px 10px; border-radius: 999px; }
 .mode-mock { background: #fff4e5; color: #9a5b00; }
 .mode-live { background: #e7f6ec; color: var(--ok); }
