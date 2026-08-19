@@ -377,3 +377,61 @@
 - 실서버 확인: KTX 서울→울산(통도사) 조회 시 직통+환승 합쳐 10건 반환, 환승 5건 표시됨.
 - 참고: SRT 환승은 미구현(라이브러리 내부 API 우회 필요, 후속 과제). KTX 환승 예약도 후속 과제(예약 데이터에 여정2 채워야 함).
 
+
+## Turn 5 — GitHub CLI 설치
+**사용자**: GitHub CLI 설치가 필요함.
+**AI**: macOS arm64 환경 확인 후 gh, brew 모두 미설치 상태 확인. Homebrew는 sudo/인터랙티브가 필요해 공식 릴리스 zip(v2.97.0, macOS arm64) 방식으로 sudo 없이 `~/.local/bin/gh`에 설치. `~/.local/bin`이 이미 `~/.zshrc` PATH에 등록되어 있어 새 셸에서 `gh` 정상 인식 확인(gh version 2.97.0). 다음 단계로 `gh auth login` 인증 안내. 파일 변경 없음(바이너리만 홈 디렉터리에 설치).
+
+## Turn 6 — OpenAI Codex CLI 설치
+**사용자**: codex cli 설치 필요.
+**AI**: codex, node/npm, cargo, brew 모두 미설치 확인. npm/Homebrew 대신 공식 GitHub 릴리스 바이너리(openai/codex, rust-v0.148.0, aarch64-apple-darwin tar.gz)를 sudo 없이 `~/.local/bin/codex`에 설치. quarantine 속성 제거 후 실행 확인(codex-cli 0.148.0). 새 셸 PATH 인식 확인. 다음 단계로 `codex login` 인증 안내. 저장소 파일 변경 없음(바이너리만 홈 디렉터리에 설치).
+
+## Turn 7 — npx skills add (orchestration) 실행
+**사용자**: `npx skills add https://github.com/stablyai/orca --skill orchestration --global` 실행 요청.
+**AI**: npx(node/npm) 미설치 확인 → 공식 Node.js LTS v24.19.0(npm/npx 11.17.0)을 sudo 없이 `~/.local`에 설치. 이후 요청 명령을 `--yes`로 실행. `orchestration` 스킬이 `~/.agents/skills/orchestration`(SKILL.md)에 전역 설치됨(보안평가 Safe/0 alerts/Low Risk). 설치 과정에서 보조 스킬 `find-skills`도 `~/.agents/skills/find-skills`에 함께 설치됨. 대상 에이전트는 Universal 기본값(13개) 선택. 저장소 파일 변경 없음(홈 디렉터리에만 설치). 사용 전 SKILL.md 검토 권고.
+
+## Turn 44 — 한국어 우선 응답 설정
+**사용자**: 앞으로 모든 대답은 한국어를 우선으로 할 것.
+**AI**: 확인. 이후 모든 응답을 한국어로 우선 작성하기로 함. 코드/명령어는 영문 유지, 설명·대화는 한국어. 파일 변경 없음.
+
+## Turn 45 — git pull (최신 코드 동기화)
+**사용자**: GitHub 프로젝트에서 최신 코드 pull.
+**AI**: `main` 브랜치에서 `git pull origin main` 실행. 결과: Already up to date(이미 최신). 파일 변경 없음.
+
+## Turn 46 — Antigravity CLI 설치
+**사용자**: Antigravity CLI 설치 요청.
+**AI**: 공식 인스톨러(`curl -fsSL https://antigravity.google/cli/install.sh | bash`)로 macOS arm64 바이너리 설치. `~/.local/bin/agy` v1.1.15. PATH는 `~/.zshrc`에 자동 추가. 저장소 파일 변경 없음(홈 디렉터리에만 설치). 첫 실행 시 Google 계정 인증 안내.
+
+## Turn 47 — 한국어 우선 응답 재확인
+**사용자**: 앞으로 모든 대답은 한국어를 우선으로 할 것.
+**AI**: 확인 및 한국어 우선 응답 방침 설정. 파일 변경 없음.
+
+## Turn 48 — GitHub 최신 코드 일치 여부 확인
+**사용자**: 현재 프로젝트의 파일들이 github 최신 코드와 동일한지 확인.
+**AI**: `git fetch` 및 `git diff origin/main`으로 원격 저장소와 비교. 소스 코드는 100% 일치하며 로컬 작업 트리에 `audit.md` 수정본 및 untracked `how_to_run.txt` 존재 확인 보고. 소스 코드 변경 없음.
+
+## Turn 49 — Codex, Kiro 공동 작업 가능 여부 설정 확인
+**사용자**: codex, kiro 와 공동 작업이 가능한지 설정 확인.
+**AI**: codex(v0.148.0), kiro(v1.0.309), agy(v1.1.15) CLI 설치 및 설정 상태, `~/.codex/config.toml` 프로젝트 신뢰 설정, `.kiro/steering/audit-logging.md`, `~/.agents/skills` 확인. 공동 작업을 위한 공통 규칙 표준(AGENTS.md) 구성 방안 제시 및 감사 로그 갱신.
+
+## Turn 50 — AGENTS.md 공통 협업 지침 파일 생성
+**사용자**: 생성.
+**AI**: Antigravity, OpenAI Codex, Kiro 간 협업을 위한 공통 표준 지침 파일 `AGENTS.md` 생성 (한국어 우선 정책, 감사 로그 규칙, 가상환경/테스트/실행 명령어, 협업 원칙 정의). 생성 파일: `AGENTS.md`. 감사 로그 갱신.
+
+## Turn 47 — 3개 에이전트 공동작업 설정 확인 + .antigravity.md 생성
+**사용자**: Antigravity/Codex/Kiro 공동 작업 가능 여부 설정 확인 후, 확인된 개선점을 만들 것.
+**AI**:
+- 확인: Codex CLI(`~/.local/bin/codex`), Antigravity CLI(`~/.local/bin/agy`) 모두 설치됨. 공용 지침 `AGENTS.md`(루트) 존재, Kiro 전용 `.kiro/steering/audit-logging.md` 존재, `.kiro/agents/`는 비어 있음(기본 에이전트 사용 중).
+- 발견: Antigravity CLI는 워크스페이스 컨텍스트로 `.antigravity.md`(최우선) 또는 `GEMINI.md`, `AGENTS.md`(하위 호환) 순으로 읽음 — `.antigravity.md`가 없어 완전한 동기화가 안 된 상태였음.
+- 조치: `.antigravity.md` 신규 생성 — `AGENTS.md`의 한국어 우선/감사 로그/개발환경/협업 원칙을 그대로 반영하고 `AGENTS.md`를 1차 소스로 참조하도록 안내. 파일 변경: `.antigravity.md`(신규, 커밋 전 상태).
+
+## Turn 48 — codex-code-mode-host 누락 오류 수정
+**사용자**: `codex '--dangerously-bypass-approvals-and-sandbox'` 실행 시 "failed to spawn code-mode host ... codex-code-mode-host: host executable was not found" 오류. 원인 확인 및 수정.
+**AI**:
+- 원인 분석: 이전 설치(Turn 6)는 codex 본체 바이너리(rust-v0.148.0, aarch64-apple-darwin)만 GitHub 릴리스에서 받았으나, `code_mode_host` 기능이 이 버전에서 기본 활성화되어 있고 별도 보조 바이너리 `codex-code-mode-host`가 요구됨. 이 보조 바이너리는 codex 자산과 별도 릴리스 파일(`codex-code-mode-host-aarch64-apple-darwin.tar.gz`)로 배포되어 설치 스크립트에 포함되지 않았음(GitHub 공개 이슈 #31863/#31831 duplicate, 동일 증상 다수 보고, 메인테이너 미답변 상태).
+- 조치: GitHub 릴리스(rust-v0.148.0)에서 `codex-code-mode-host-aarch64-apple-darwin.tar.gz` 다운로드 → 압축 해제 → `~/.local/bin/codex-code-mode-host`(실행권한 부여, quarantine 속성 제거) 설치.
+- 검증: `codex-code-mode-host --help` 정상 응답. `codex exec --dangerously-bypass-approvals-and-sandbox "pwd"` 재실행 시 이전 오류 재현되지 않고 셸 명령(`pwd && git status`)이 정상 실행됨. 저장소 파일 변경 없음(홈 디렉터리에만 바이너리 추가).
+
+## Turn 51 — 3개 에이전트 공동 작업 준비 상태 재점검
+**사용자**: 현재 프로젝트가 Antigravity, Codex CLI, Kiro 공동 작업이 가능한 상태인지 확인 요청.
+**AI**: 세 CLI 설치 상태(Antigravity 1.1.15, Codex CLI 0.148.0, Kiro 1.0.309), Codex 보조 호스트 및 ChatGPT 로그인, Codex 프로젝트 신뢰 설정, 공통 `AGENTS.md`, Antigravity 컨텍스트 `.antigravity.md`, Kiro steering, Git `main`/`origin/main` 동기화 상태를 확인함. `.venv` Python 3.13.15에서 pytest 16건 통과(경고 1건). 공동 작업은 가능하나 `AGENTS.md`와 `.antigravity.md`가 아직 untracked이고 `audit.md`에 과거 Turn 번호 중복 및 미커밋 변경이 있어 커밋 전 정리와 동시 수정 방지 필요. Antigravity 로그인 상태는 비대화형 세션의 TTY 제한으로 직접 확인하지 못함. 변경 파일: `audit.md`에 본 기록 append.
