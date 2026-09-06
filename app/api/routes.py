@@ -82,25 +82,22 @@ def _default_datetime():
 def index(request: Request) -> HTMLResponse:
     settings = get_settings()
     store = get_credential_store()
-    train_types = list(TrainType)
-    default_type = train_types[0] if train_types else None
+    # 2026.9 KTX/SRT 통합 이후 코레일(KTX) 단일 운영사
     try:
-        # 초기 노출 계정은 기본 선택 열차(첫 번째 종류)의 계정만.
-        creds = store.list_credentials(default_type) if default_type else []
+        creds = store.list_credentials(TrainType.KTX)
     except Exception:  # noqa: BLE001 - 자격증명 로드 실패 시에도 화면은 뜨게
         creds = []
     default_date, default_time = _default_datetime()
-    default_dep, default_arr = get_default_stations(default_type) if default_type else ("서울", "부산")
+    default_dep, default_arr = get_default_stations(TrainType.KTX)
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "settings": settings,
             "credentials": creds,
-            "train_types": train_types,
             "default_date": default_date,
             "default_time": default_time,
-            "stations": get_stations(default_type) if default_type else [],
+            "stations": get_stations(TrainType.KTX),
             "default_dep": default_dep,
             "default_arr": default_arr,
             "nav_active": "search",

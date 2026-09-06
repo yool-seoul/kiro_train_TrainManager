@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """전역 설정.
 
-    - `data_source` 가 "mock" 이면 실제 Korail/SRT 로 나가지 않고 가짜 데이터를 쓴다.
+    - `data_source` 가 "mock" 이면 실제 코레일(KTX)로 나가지 않고 가짜 데이터를 쓴다.
       실연동 전환은 이 값을 "live" 로 바꾸는 것만으로 이루어진다.
     """
 

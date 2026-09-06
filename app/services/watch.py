@@ -4,7 +4,7 @@
 좌석이 생기면 즉시 선점(reserve)하고 상태를 RESERVED 로 바꿔 "결제 필요"를 알린다.
 
 설계 노트:
-- provider(korail2/SRTrain)는 blocking I/O 이므로 asyncio 대신 daemon 스레드를 쓴다.
+- provider(korail2)는 blocking I/O 이므로 asyncio 대신 daemon 스레드를 쓴다.
 - anti-bot/계정 보호를 위해 폴링 주기는 하한(min_interval)을 두고 보수적으로 유지한다.
 - 동시 watch 개수와 최대 감시 시간을 제한한다.
 """

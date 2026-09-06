@@ -1,7 +1,7 @@
 """도메인 모델 및 DTO.
 
-KTX(Korail)와 SRT 는 내부 필드가 다르지만, 웹/서비스 레이어에서는
-아래의 통일된 모델만 다룬다. 각 provider 어댑터가 자사 응답을 이 모델로 변환한다.
+코레일(KTX) 응답을 웹/서비스 레이어가 다루는 통일된 모델로 변환한다.
+provider 어댑터가 자사 응답을 이 모델로 매핑한다.
 """
 
 from __future__ import annotations
@@ -13,10 +13,12 @@ from pydantic import BaseModel, Field
 
 
 class TrainType(str, Enum):
-    """열차 운영사 구분."""
+    """열차 운영사 구분.
+
+    2026년 9월 KTX/SRT 통합 이후 코레일(KTX) 단일 운영사만 사용한다.
+    """
 
     KTX = "ktx"
-    SRT = "srt"
 
 
 class SeatClass(str, Enum):
@@ -106,7 +108,7 @@ class TrainOption(BaseModel):
 
     train_id: str                              # provider 가 만든 stable selector
     train_type: TrainType
-    train_name: str                            # 예: "KTX 101", "SRT 351"
+    train_name: str                            # 예: "KTX 101", "KTX-산천 259"
     dep_station: str
     arr_station: str
     dep_time: datetime

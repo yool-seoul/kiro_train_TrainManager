@@ -25,15 +25,10 @@ def get_provider(train_type: TrainType) -> TrainProvider:
         from app.providers.mock import MockProvider
 
         provider = MockProvider(train_type)
-    else:  # live
-        if train_type is TrainType.KTX:
-            from app.providers.ktx import KtxProvider
+    else:  # live — 2026.9 KTX/SRT 통합 이후 코레일(KTX) 단일 provider
+        from app.providers.ktx import KtxProvider
 
-            provider = KtxProvider()
-        else:
-            from app.providers.srt import SrtProvider
-
-            provider = SrtProvider()
+        provider = KtxProvider()
 
     _instances[key] = provider
     return provider

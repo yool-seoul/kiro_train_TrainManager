@@ -5,7 +5,7 @@
 - csv_url:        공개 시트의 CSV export URL (인증 불필요, 간단)
 
 기대 컬럼(대소문자 무시, 순서 무관):
-    provider   (ktx | srt)   [필수]
+    provider   (ktx)          [필수]
     login_id                  [필수]
     password                  [필수]
     ncard_no                  [선택]
@@ -44,10 +44,9 @@ def _row_to_credential(row: dict[str, str]) -> Credential | None:
         return None
     try:
         provider = TrainType(norm["provider"].lower())
-    except ValueError as exc:
-        raise CredentialError(
-            f"provider 값이 잘못됨: {norm.get('provider')!r} (ktx|srt 만 허용)"
-        ) from exc
+    except ValueError:
+        # 2026.9 KTX/SRT 통합 이후 ktx 만 지원. 그 외(srt 등)는 조용히 건너뛴다.
+        return None
     return Credential(
         provider=provider,
         login_id=norm["login_id"],

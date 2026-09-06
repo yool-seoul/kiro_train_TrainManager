@@ -22,7 +22,7 @@ def _force_mock(monkeypatch):
     """이 모듈의 통합 스모크 테스트는 mock provider 기준이다.
 
     실제 .env 가 data_source=live 여도 여기서는 mock 으로 고정해
-    외부(Korail/SRT) 의존 없이 결정적으로 동작하게 한다.
+    외부(Korail) 의존 없이 결정적으로 동작하게 한다.
     """
     from app.config import get_settings
     from app.providers.factory import reset_providers
@@ -90,7 +90,7 @@ def test_watch_job_eventually_reserves(monkeypatch):
 
     watch = get_watch_service()
     job = watch.create_watch(
-        TrainType.SRT, "수서", "부산", "20260901", "080000",
+        TrainType.KTX, "서울", "부산", "20260901", "080000",
         passengers=Passengers(adults=1),
         seat_class=SeatClass.GENERAL,
     )
@@ -146,7 +146,7 @@ def test_reserved_watch_cannot_be_stopped(monkeypatch):
 
     watch = get_watch_service()
     job = watch.create_watch(
-        TrainType.SRT, "수서", "부산", "20260901", "080000",
+        TrainType.KTX, "서울", "부산", "20260901", "080000",
         passengers=Passengers(adults=1),
     )
     # reserved 될 때까지 대기

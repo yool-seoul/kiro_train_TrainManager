@@ -22,7 +22,7 @@ pip install -r requirements.txt
   - 없으면 .env.example 을 복사해서 값을 채웁니다:  cp .env.example .env
   - 주요 값:
       TRAINMGR_DATA_SOURCE=mock   (가짜 데이터, 테스트용 / 실제 예약 X)
-      TRAINMGR_DATA_SOURCE=live   (실제 KTX/SRT 연동 - 실제 좌석 선점 주의)
+      TRAINMGR_DATA_SOURCE=live   (실제 KTX(코레일) 연동 - 실제 좌석 선점 주의)
 
 
 ------------------------------------------

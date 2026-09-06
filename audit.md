@@ -439,3 +439,29 @@
 ## Turn 57 — 협업 설정 PR 생성 및 다중 에이전트 리뷰
 **사용자**: 변경 파일을 별도 원격 브랜치에 커밋·푸시하고 PR 생성 후 Antigravity와 Codex 리뷰가 정상이면 병합 요청.
 **AI**: `chore/multi-agent-collaboration` 브랜치에 변경 파일 4개를 커밋·푸시하고 GitHub PR #8을 생성함. Orca orchestration으로 Antigravity와 Codex에 독립 리뷰를 요청했으며 테스트 16건 통과를 확인함. 1차 리뷰에서 Antigravity는 승인했고 Codex가 `audit.md` Turn 번호 중복·역순을 차단 이슈로 지적하여, 이번 PR에서 추가된 항목을 기존 Turn 43 이후 44–56의 단조 증가 순서로 재번호화하고 재검토 대상으로 준비함. 변경 파일: `audit.md`.
+
+## Turn 58 — 원격 main과 로컬 코드 차이 비교
+**사용자**: GitHub remote main 브랜치의 최신 코드를 확인하고 로컬 코드와 차이점 비교.
+
+**AI**: `git fetch origin` 후 비교. 로컬 HEAD와 origin/main 모두 `fb926f3`로 동일, 워킹 트리 clean → **차이 없음**. PR #7(946a38c) 이후 다른 에이전트가 PR #8로 3개 커밋 추가(`b62126b` AGENTS.md, `0ed26d2` audit 번호 정규화, `fb926f3` 머지)했고, 로컬도 이미 최신 반영됨. PR #8 변경 파일: `.antigravity.md`, `AGENTS.md`, `audit.md`, `how_to_run.txt` (206줄 추가).
+
+## Turn 59 — KTX/SRT 통합 대응: SRT 코드·UI 전면 제거
+**사용자**: 2026년 9월 KTX/SRT 통합으로 앞으로 KTX만 사용 가능. (1) KTX 조회 관련 GitHub skill 업데이트 조사, (2) SRT 관련 코드 제거, (3) SRT 관련 UI 제거.
+
+**AI**:
+- (1) 조사: NomaDamas/k-skill이 기존 `ktx-booking`/`srt-booking` 스킬을 제거하고 `railway-timetable`(코레일 통합 시간표, KTX-family, 조회 전용)로 대체 → 운영 통합 반영 확인. 우리 앱은 실제 예약 위해 `korail2-ncard`(유지보수 중) 유지, `SRTrain`(2025.1 이후 미업데이트)만 제거하면 됨.
+- (2) 백엔드 제거:
+  - `app/providers/srt.py` 삭제.
+  - `schemas/train.py`: `TrainType`에서 `SRT` 멤버 제거(KTX 단일).
+  - `providers/factory.py`: live 분기를 KTX 단일 provider로 단순화.
+  - `providers/__init__.py`, `base.py`, `mock.py`, `config.py`, `services/watch.py`, `notify/base.py`, `app/__init__.py`: KTX/SRT 언급 docstring·문구 정리. mock prefix "KTX" 고정.
+  - `credentials/mock_store.py`: SRT 데모 계정 제거.
+  - `credentials/google_sheet_store.py`: provider가 ktx 아니면 `CredentialError` 대신 조용히 skip(시트에 srt 행 남아도 안전). docstring/에러 문구 수정.
+  - `stations.py`: `SRT_STATIONS` 및 SRT 기본역 제거, `get_stations`/`get_default_stations` KTX 단일.
+  - `requirements.txt`: `SRTrain` 의존성 제거.
+- (3) UI 제거:
+  - `index.html`: 열차 종류 `<select>` → `<input type="hidden" name="train_type" value="ktx">`, 열차 종류 전환 JS(defaultStations srt 포함) 삭제.
+  - `base.html` footer, `reservation.html` 문구 "KTX/SRT" → "코레일(KTX)".
+  - `routes.py` index: `train_types` 제거하고 KTX 고정.
+- 테스트: `test_app.py`(watch 테스트 TrainType.SRT→KTX, 수서/부산→서울/부산), `test_notify.py`(SRT 예약→KTX), `test_live_providers.py`(SRT fakes+테스트 2건 삭제, docstring 수정). **pytest 14건 통과**(SRT 2건 제거로 16→14).
+- 검증: 서버 재기동 정상. 메인 화면 train_type select 제거·hidden=ktx·SRT 문구 없음 확인. Google Sheet에 srt 행이 있어도 KTX 계정 1건만 로딩(조용히 skip). 실 KTX 조회(직통+환승 10건) 정상.
