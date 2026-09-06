@@ -12,9 +12,8 @@ gspread>=6.0,<7.0
 google-auth>=2.29,<3.0
 
 # --- 실제 열차 연동 (data_source=live) ---
-# Python 3.10+ 필요.
+# Python 3.10+ 필요. (2026.9 KTX/SRT 통합 이후 코레일(KTX) 단일)
 korail2-ncard>=0.1,<1.0     # KTX/Korail (anti-bot 보완 fork). import 이름은 korail2
-SRTrain>=2.0,<3.0           # SRT. import 이름은 SRT
 pycryptodome>=3.20,<4.0     # korail2 로그인 암호화(AES)
 
 # --- 개발/테스트 ---

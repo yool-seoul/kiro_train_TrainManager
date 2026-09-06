@@ -8,5 +8,5 @@
     <li>운임: {{ reservation.fare|fmt_won }} ({{ reservation.passengers.total }}명)</li>
     {% if reservation.deadline %}<li class="warn">구입기한: {{ reservation.deadline|fmt_time }} 까지 결제 필요</li>{% endif %}
   </ul>
-  <p class="muted">좌석은 확보되었습니다. 실제 결제는 공식 KTX/SRT 화면에서 진행하세요.</p>
+  <p class="muted">좌석은 확보되었습니다. 실제 결제는 공식 코레일(KTX) 화면에서 진행하세요.</p>
 </div>

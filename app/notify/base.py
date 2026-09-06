@@ -49,7 +49,7 @@ def build_reservation_message(r: Reservation, *, header: str | None = None) -> s
     lines.append(f"예약번호: {r.reservation_id}")
     if r.deadline:
         lines.append(f"구입기한: {r.deadline:%m/%d %H:%M} 까지")
-    lines.append("결제는 공식 KTX/SRT 화면에서 진행하세요.")
+    lines.append("결제는 공식 코레일(KTX) 화면에서 진행하세요.")
     return "\n".join(lines)
 
 
@@ -61,6 +61,6 @@ def build_reserved_message(job: WatchJob) -> str:
     lines = [
         "🚄 좌석 선점 완료 — 결제가 필요합니다.",
         f"{job.train_type.value.upper()} {job.dep_station}→{job.arr_station}",
-        "결제는 공식 KTX/SRT 화면에서 진행하세요.",
+        "결제는 공식 코레일(KTX) 화면에서 진행하세요.",
     ]
     return "\n".join(lines)

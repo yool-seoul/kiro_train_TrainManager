@@ -19,12 +19,6 @@ class MockCredentialStore(CredentialStore):
                 password="mock",
                 label="데모 KTX 계정",
             ),
-            Credential(
-                provider=TrainType.SRT,
-                login_id="srt_demo_user",
-                password="mock",
-                label="데모 SRT 계정",
-            ),
         ]
 
     def list_credentials(self, train_type: TrainType | None = None) -> list[Credential]:

@@ -1,6 +1,6 @@
 """Mock provider - 가짜 데이터로 전체 흐름을 구동한다.
 
-실제 Korail/SRT 에 접속하지 않으므로 계정/네트워크 없이 UI·로직·리뷰가 가능하다.
+실제 코레일(KTX)에 접속하지 않으므로 계정/네트워크 없이 UI·로직·리뷰가 가능하다.
 자동 예약대기(watch) 를 시연할 수 있도록, 매진 열차가 폴링 중 확률적으로
 좌석이 풀리도록 설계했다.
 """
@@ -83,7 +83,7 @@ class MockProvider(TrainProvider):
         except ValueError as exc:
             raise ProviderError(f"잘못된 날짜/시각 형식: {date} {time}", code="bad_input") from exc
 
-        prefix = "KTX" if self.train_type is TrainType.KTX else "SRT"
+        prefix = "KTX"
 
         options: list[TrainOption] = []
         n = min(limit, 8) if limit else 8

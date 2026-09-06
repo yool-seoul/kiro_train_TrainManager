@@ -40,10 +40,10 @@ def _reservation() -> Reservation:
 
 def _reserved_job() -> WatchJob:
     res = Reservation(
-        reservation_id="SRT123",
-        train_type=TrainType.SRT,
-        train_name="SRT 351",
-        dep_station="수서",
+        reservation_id="KTX123",
+        train_type=TrainType.KTX,
+        train_name="KTX 351",
+        dep_station="서울",
         arr_station="부산",
         dep_time=datetime(2026, 9, 1, 8, 0),
         arr_time=datetime(2026, 9, 1, 10, 24),
@@ -55,7 +55,7 @@ def _reserved_job() -> WatchJob:
         deadline=datetime(2026, 9, 1, 8, 30),
     )
     return WatchJob(
-        job_id="j1", train_type=TrainType.SRT, dep_station="수서", arr_station="부산",
+        job_id="j1", train_type=TrainType.KTX, dep_station="서울", arr_station="부산",
         date="20260901", time="080000", passengers=Passengers(adults=1),
         status=WatchStatus.RESERVED, reservation=res,
     )
@@ -64,8 +64,8 @@ def _reserved_job() -> WatchJob:
 def test_build_reserved_message_contains_key_fields():
     msg = build_reserved_message(_reserved_job())
     assert "좌석 선점 완료" in msg
-    assert "SRT 351" in msg
-    assert "SRT123" in msg
+    assert "KTX 351" in msg
+    assert "KTX123" in msg
     assert "53,700원" in msg
     assert "3호차 10A" in msg
 
